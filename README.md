@@ -58,6 +58,26 @@ Code can ask "what's been happening on this Mac."
 - **MCP server** — both a localhost HTTP API and a stdio JSON-RPC server
   (`Burrow --mcp`) so Claude Code can query your Mac's recent state.
 
+## How Burrow compares
+
+|  | **Burrow** | mole.fit | CleanMyMac | Pearcleaner | `mo` / ncdu |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Price | **Free** | $9 once | Subscription | Free | Free |
+| Open source | **MIT** | – | – | ✅ | ✅ (`mo`) |
+| Signed / notarized | not yet | ✅ | ✅ | ✅ | n/a |
+| Junk cleanup | ✅ | ✅ | ✅ | – | ✅ (`mo`) |
+| Uninstall + leftovers | ✅ | ✅ | ✅ | ✅ *(focus)* | ✅ (`mo`) |
+| Disk treemap | ✅ | ✅ | ✅ | – | ncdu *(TUI)* |
+| Live system monitor | ✅ | ✅ | partial | – | – |
+| Long-term metric history | ✅ | – | – | – | – |
+| MCP / agent API | ✅ | – | – | – | – |
+| GUI | ✅ | ✅ | ✅ | ✅ | – *(terminal)* |
+
+Honest notes: **mole.fit** is more polished, signed, and supported — buy it
+($9) if you want that and to fund `mo`. **Pearcleaner** is an excellent,
+focused open-source uninstaller. **ncdu**/`mo` are terminal tools; Burrow is
+the GUI for people who'd rather not live in the shell.
+
 ## Requirements
 
 - **macOS 14+**
@@ -66,28 +86,60 @@ Code can ask "what's been happening on this Mac."
 
 ## Install
 
+> Burrow is **unsigned** for now (pre-1.0). Each path below clears the
+> Gatekeeper quarantine for you. The honest security/trust details — network,
+> admin rights, no telemetry — are in **[SECURITY.md](SECURITY.md)**.
+
+### Homebrew (recommended)
+
+```bash
+brew install mole                        # required engine
+brew install --cask caezium/tap/burrow   # the app (clears quarantine)
+```
+
+### Direct download
+
+Download `Burrow-x.y.z.zip` from
+[Releases](https://github.com/caezium/Burrow/releases), unzip into
+`/Applications`, then:
+
+```bash
+xattr -cr /Applications/Burrow.app
+open /Applications/Burrow.app
+```
+
 ### Build from source
 
 ```bash
 brew install xcodegen mole
-git clone https://github.com/caezium/Burrow.git
-cd Burrow
+git clone https://github.com/caezium/Burrow.git && cd Burrow
 xcodegen generate
 xcodebuild -project Burrow.xcodeproj -scheme Burrow \
   -configuration Release -destination 'generic/platform=macOS' \
   -derivedDataPath build \
-  CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
-  build
+  CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO build
 cp -R build/Build/Products/Release/Burrow.app /Applications/
-xattr -cr /Applications/Burrow.app   # unsigned dev build: clear quarantine
+xattr -cr /Applications/Burrow.app
 open /Applications/Burrow.app
 ```
 
 Burrow lives in the menu bar (it's a menu-bar agent). Click the icon →
 **Open Burrow**.
 
-> A signed/notarized release and a Homebrew cask are planned so install is
-> a one-liner without the Gatekeeper step.
+## Security & trust
+
+Burrow drives the audited `mo` CLI and adds no surveillance of its own:
+
+- **No telemetry, analytics, accounts, ads, or third-party SDKs**, and no
+  backend — nothing to phone home to.
+- **No background root helper.** When Clean/Optimize need admin rights,
+  macOS's own dialog asks you and Burrow runs that one `mo` command, then
+  exits — you approve every elevation.
+- **Local-only:** the MCP HTTP server is loopback (`127.0.0.1`, toggle off
+  in Settings); history is a local SQLite file. The one opt-in network call
+  is `brew outdated` in the Updates tab.
+- **Unsigned, pre-1.0** — full honest write-up, including the trade-offs of
+  the admin path, in **[SECURITY.md](SECURITY.md)**.
 
 ## Wire it into Claude Code
 

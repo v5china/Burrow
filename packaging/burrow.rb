@@ -20,6 +20,18 @@ cask "burrow" do
 
   app "Burrow.app"
 
+  # Pre-1.0 builds aren't notarized yet, so clear the quarantine flag to
+  # avoid a Gatekeeper block on first launch. Remove this once the app
+  # ships signed + notarized.
+  postflight do
+    system_command "/usr/bin/xattr", args: ["-cr", "#{appdir}/Burrow.app"], sudo: false
+  end
+
+  caveats <<~EOS
+    Burrow is an unsigned pre-1.0 build. If macOS still blocks it, right-click
+    the app and choose Open, or run:  xattr -cr "#{appdir}/Burrow.app"
+  EOS
+
   zap trash: [
     "~/Library/Application Support/Burrow",
     "~/Library/Preferences/dev.caezium.Burrow.plist",
