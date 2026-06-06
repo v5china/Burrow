@@ -309,7 +309,7 @@ struct PillButton: View {
     let action: () -> Void
     var body: some View {
         Button(action: action) {
-            Text(title)
+            Text(NSLocalizedString(title, comment: ""))
                 .font(Brand.sans(13, .semibold))
                 .foregroundStyle(filled ? Color.black : Brand.textPrimary)
                 .padding(.horizontal, 22).padding(.vertical, 10)
@@ -330,8 +330,8 @@ struct ToolHero<Buttons: View>: View {
             Spacer()
             HeroOrb(accent: tool.accent)
             VStack(spacing: 8) {
-                Text(title).font(Brand.serif(28, .medium)).foregroundStyle(Brand.textPrimary)
-                Text(subtitle).font(Brand.serif(15)).italic().foregroundStyle(Brand.textSecondary)
+                Text(NSLocalizedString(title, comment: "")).font(Brand.serif(28, .medium)).foregroundStyle(Brand.textPrimary)
+                Text(NSLocalizedString(subtitle, comment: "")).font(Brand.serif(15)).italic().foregroundStyle(Brand.textSecondary)
             }
             HStack(spacing: 12) { buttons() }.padding(.top, 4)
             Spacer(); Spacer()
@@ -353,7 +353,7 @@ struct DoneBanner: View {
                 Image(systemName: "checkmark").font(.system(size: 16, weight: .bold)).foregroundStyle(accent)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(Brand.sans(15, .semibold)).foregroundStyle(Brand.textPrimary)
+                Text(NSLocalizedString(title, comment: "")).font(Brand.sans(15, .semibold)).foregroundStyle(Brand.textPrimary)
                 if let d = detail { Text(d).font(Brand.mono(11)).foregroundStyle(Brand.textSecondary) }
             }
             Spacer()
