@@ -303,7 +303,7 @@ final class SoftwareModel: ObservableObject {
         let targets = apps.filter { selected.contains($0.id) }
         guard !targets.isEmpty else { return }
         let alert = NSAlert()
-        alert.messageText = String(format: NSLocalizedString("Uninstall %d apps?", comment: ""), targets.count)
+        alert.messageText = String(format: NSLocalizedString(targets.count == 1 ? "Uninstall %d app?" : "Uninstall %d apps?", comment: ""), targets.count)
         alert.informativeText = String(format: NSLocalizedString("These move to the Trash (recoverable):\n\n%@", comment: ""),
                                        targets.map { "• \($0.name)" }.joined(separator: "\n"))
         alert.alertStyle = .warning

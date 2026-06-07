@@ -201,12 +201,14 @@
 "%d apps" = "%d 个应用";
 "%d selected · %@" = "已选择 %d 个 · %@";
 "Uninstall (%d)" = "卸载 (%d)";
+"Uninstall %d app?" = "确定卸载 %d 个应用吗？";
 "Uninstall %d apps?" = "确定卸载 %d 个应用吗？";
 "These move to the Trash (recoverable):\n\n%@" = "这些应用会移到废纸篓（可恢复）：\n\n%@";
 "Move to Trash" = "移到废纸篓";
 "Checking Homebrew…" = "正在检查 Homebrew…";
 "Everything's up to date" = "所有内容都是最新的";
 "Homebrew formulae & casks" = "Homebrew formulae 和 casks";
+"%d update" = "%d 个更新";
 "%d updates" = "%d 个更新";
 "Update all" = "全部更新";
 "Updating…" = "正在更新…";

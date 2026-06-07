@@ -64,7 +64,7 @@ struct UpdatesView: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            Text(String(format: NSLocalizedString("%d updates", comment: ""), model.items.count))
+            Text(String(format: NSLocalizedString(model.items.count == 1 ? "%d update" : "%d updates", comment: ""), model.items.count))
                 .font(Brand.mono(12)).foregroundStyle(Brand.textSecondary)
             Spacer()
             Button { model.reload() } label: {

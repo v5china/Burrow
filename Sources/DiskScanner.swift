@@ -10,6 +10,7 @@
 //  Mole returns only the immediate children of the requested path, with
 //  their aggregate sizes. The drill-in UX (click a directory to descend)
 //  means we don't need to recurse upfront — each level is one mo call.
+//  Typical home folder scan finishes in a few seconds.
 //
 //  Why not FileManager.enumerator: Mole's analyze-go walks via
 //  getattrlistbulk which is ~10× faster than NSFileManager for large
@@ -69,17 +70,10 @@ enum DiskScanner {
     /// for each direct child; drill in by calling again with the child's
     /// path.
     static func scan(_ path: String) throws -> DiskScanResult {
-        if isSamePath(path, NSHomeDirectory()) {
-            return try scanHome(path)
-        }
-        return try scanWithMole(path)
-    }
-
-    private static func scanWithMole(_ path: String) throws -> DiskScanResult {
         guard MoleCLI.findExecutable() != nil else {
             throw DiskScanError.moNotFound
         }
-        // 5-minute timeout — `mo analyze` on a large directory is usually a
+        // 5-minute timeout — `mo analyze` on the home dir is usually a
         // few seconds, but a cold cache + large external volume + no
         // indexing can stretch it. Beyond 5 min something's wrong.
         let result = try MoleCLI.run(args: ["analyze", "--json", path], timeout: 300)
@@ -90,43 +84,6 @@ enum DiskScanner {
             throw DiskScanError.parseFailed("non-utf8 stdout")
         }
         return try Self.parse(data)
-    }
-
-    private static func scanHome(_ path: String) throws -> DiskScanResult {
-        let homeURL = URL(fileURLWithPath: path)
-        let urls = try FileManager.default.contentsOfDirectory(
-            at: homeURL,
-            includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey, .fileAllocatedSizeKey, .totalFileAllocatedSizeKey],
-            options: [.skipsPackageDescendants]
-        )
-
-        var entries: [DiskScanEntry] = []
-        entries.reserveCapacity(urls.count)
-        for url in urls {
-            let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .contentModificationDateKey, .fileAllocatedSizeKey, .totalFileAllocatedSizeKey])
-            let metadataSize = Int64(values?.totalFileAllocatedSize ?? values?.fileAllocatedSize ?? 0)
-            entries.append(DiskScanEntry(
-                id: url.path,
-                name: url.lastPathComponent,
-                path: url.path,
-                size: metadataSize,
-                isDir: values?.isDirectory ?? false,
-                lastAccess: values?.contentModificationDate
-            ))
-        }
-        entries.sort { $0.size > $1.size }
-        let total = entries.reduce(0) { $0 + $1.size }
-        return DiskScanResult(
-            path: path,
-            totalSize: total,
-            totalFiles: entries.count,
-            entries: entries,
-            scannedAt: Date()
-        )
-    }
-
-    private static func isSamePath(_ lhs: String, _ rhs: String) -> Bool {
-        URL(fileURLWithPath: lhs).standardizedFileURL.path == URL(fileURLWithPath: rhs).standardizedFileURL.path
     }
 
     // MARK: - Parsing
