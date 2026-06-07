@@ -58,23 +58,53 @@ final class MoInteractiveRunner: ObservableObject {
         start()
     }
 
-    /// Apply selection: toggle the wanted rows, RE-READ the screen, and only
-    /// press Enter if the on-screen checks match exactly — otherwise bail
-    /// without removing anything.
+    /// Apply selection: toggle the wanted rows, then poll the screen until the
+    /// redraw settles and confirm ONLY if the checked rows match the wanted
+    /// items BY NAME (not just by index) and the list didn't shift/scroll —
+    /// otherwise quit without removing anything. Identity matching means a
+    /// scrolled frame that happens to check the same index positions can't
+    /// trick Mole into deleting the wrong files.
     func confirm(_ wanted: Set<Int>) {
         guard phase == .choosing, !wanted.isEmpty else { return }
         phase = .applying
+        let wantedNames = Set(wanted.compactMap { items.indices.contains($0) ? items[$0].name : nil })
+        let expectedCount = items.count
         pty.send(MoTUI.keystrokesToSelect(wanted, count: items.count, confirm: false))
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
-            guard let self, self.phase == .applying else { return }
-            let onScreen = MoTUI.selectedIndices(MoTUI.parse(self.screen))
-            if onScreen == wanted {
-                self.confirmed = true
-                self.pty.send([0x0d])   // Enter → Mole removes exactly these
+        verifyThenConfirm(wanted: wanted, wantedNames: wantedNames, expectedCount: expectedCount, attempt: 0, last: nil)
+    }
+
+    /// Re-read every 0.15s (up to ~2s) until the on-screen selection is stable
+    /// across two reads, then verify by index AND name AND unchanged row count
+    /// before pressing Enter. Any mismatch or timeout → quit, delete nothing.
+    private func verifyThenConfirm(wanted: Set<Int>, wantedNames: Set<String>,
+                                   expectedCount: Int, attempt: Int, last: Set<Int>?) {
+        guard phase == .applying else { return }
+        let screenNow = MoTUI.parse(screen)
+        let onScreen = MoTUI.selectedIndices(screenNow)
+        let maxAttempts = 14   // ~2.1s
+
+        if attempt > 0, onScreen == last {          // settled
+            let onScreenNames = Set(screenNow.items.filter { $0.selected }.map { $0.name })
+            let safe = screenNow.items.count == expectedCount
+                && onScreen == wanted
+                && onScreenNames == wantedNames
+            if safe {
+                confirmed = true
+                pty.send([0x0d])                    // Enter → Mole removes exactly these
             } else {
-                self.pty.send(MoTUI.quit)
-                self.phase = .failed("Couldn't confirm the selection safely (\(onScreen.count)/\(wanted.count) toggled). Nothing was removed — please try again.")
+                pty.send(MoTUI.quit)
+                phase = .failed("Couldn't confirm the selection safely (\(onScreen.count)/\(wanted.count) toggled). Nothing was removed — please try again.")
             }
+            return
+        }
+        guard attempt < maxAttempts else {
+            pty.send(MoTUI.quit)
+            phase = .failed("The selection didn't settle in time. Nothing was removed — please try again.")
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            self?.verifyThenConfirm(wanted: wanted, wantedNames: wantedNames,
+                                    expectedCount: expectedCount, attempt: attempt + 1, last: onScreen)
         }
     }
 
@@ -194,7 +224,7 @@ struct MoInteractiveView: View {
                 Text(cfg.tool.title).font(Brand.serif(18, .medium)).foregroundStyle(Brand.textPrimary)
                 Text(countLabel).font(Brand.mono(11)).foregroundStyle(Brand.textTertiary)
                 Spacer()
-                Button { runner.cancel(); runner.rescan(); selected = [] } label: {
+                Button { runner.rescan(); selected = [] } label: {   // rescan() tears down the old PTY itself
                     Label("Rescan", systemImage: "arrow.clockwise").font(Brand.mono(11)).foregroundStyle(Brand.textSecondary)
                 }.buttonStyle(.plain)
             }

@@ -180,7 +180,10 @@ final class PTYTask {
         proc.environment = env
         proc.terminationHandler = { [weak self] _ in self?.onExit?() }
         master = FileHandle(fileDescriptor: amaster, closeOnDealloc: true)
-        try proc.run()
+        // Close the parent's slave fd whether or not the launch succeeds — on a
+        // throw the child never starts, so nothing else would ever close it.
+        do { try proc.run() }
+        catch { close(aslave); throw error }
         close(aslave)   // parent doesn't use the slave end
     }
 
