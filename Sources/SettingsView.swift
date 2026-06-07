@@ -135,14 +135,38 @@ struct SettingsView: View {
             .foregroundStyle(Brand.textTertiary).padding(.top, 2)
     }
 
-    /// One example prompt the user can paste to their agent.
-    private func promptRow(_ text: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: "arrow.right").font(.system(size: 8, weight: .bold))
-                .foregroundStyle(Brand.green).accessibilityHidden(true)
-            Text("\u{201C}\(text)\u{201D}").font(Brand.sans(12)).foregroundStyle(Brand.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
+    /// One example prompt with a one-click copy button (the text isn't
+    /// selectable, so the button is the only way to grab it).
+    private func promptRow(_ text: String) -> some View { PromptRow(text: text) }
+
+    private struct PromptRow: View {
+        let text: String
+        @State private var copied = false
+        @State private var hovering = false
+
+        var body: some View {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "arrow.right").font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(Brand.green).accessibilityHidden(true)
+                Text("\u{201C}\(text)\u{201D}").font(Brand.sans(12)).foregroundStyle(Brand.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 6)
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(text, forType: .string)
+                    copied = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { copied = false }
+                } label: {
+                    Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 10))
+                        .foregroundStyle(copied ? Brand.green : (hovering ? Brand.textSecondary : Brand.textTertiary))
+                }
+                .buttonStyle(.plain)
+                .help("Copy prompt")
+                .accessibilityLabel("Copy prompt")
+            }
+            .contentShape(Rectangle())
+            .onHover { hovering = $0 }
         }
     }
 
