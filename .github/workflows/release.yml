@@ -16,9 +16,15 @@ on:
 permissions:
   contents: write # create the GitHub release on this repo
 
+concurrency:
+  # Serialize releases so two version tags can't race the tap push.
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: macos-14
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -76,6 +82,14 @@ jobs:
             -e "s/version \"[^\"]+\"/version \"${VERSION}\"/" \
             -e "s/sha256 \"[^\"]+\"/sha256 \"${SHA}\"/" \
             "$CASK"
+          # Guard against a silent no-op: if the cask's format ever drifts so
+          # the sed matches nothing, the version/sha won't be present and the
+          # `git diff --quiet` below would otherwise report success while the
+          # tap stays stale. Fail loudly instead.
+          if ! grep -q "version \"${VERSION}\"" "$CASK" || ! grep -q "sha256 \"${SHA}\"" "$CASK"; then
+            echo "::error::cask edit didn't take — $CASK is missing version \"${VERSION}\" or the new sha256 after sed. Its format may have drifted; bump it by hand."
+            exit 1
+          fi
           cd tap
           if git diff --quiet; then
             echo "cask already at ${VERSION}; nothing to do"
