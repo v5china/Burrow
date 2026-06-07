@@ -43,6 +43,9 @@ struct AnalyzeView: View {
         if Privacy.shouldOfferFullDiskAccessNow() {
             showFDAGate = true
         } else {
+            // FDA may have just been granted (or the notice dismissed) while
+            // the gate was up — make sure it doesn't keep covering the view.
+            showFDAGate = false
             model.startIfNeeded()
         }
     }
