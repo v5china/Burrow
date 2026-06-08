@@ -89,6 +89,15 @@
   .hero .meta b { color: var(--accent); font-weight: 600; }
   .hero .meta .dot { color: var(--hair); }
   .cta { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 34px; }
+  .hero-cmd { margin: 18px 0 0; font-family: var(--mono); font-size: 14px; color: var(--ink);
+    background: rgba(243,236,221,0.05); border: 1px solid var(--hair); border-radius: 11px;
+    padding: 12px 17px; display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    cursor: pointer; transition: .15s; text-align: left; }
+  .hero-cmd:hover { border-color: rgba(217,160,102,0.55); background: rgba(243,236,221,0.07); }
+  .hero-cmd .dollar { color: var(--accent); }
+  .hero-cmd .hint { font-family: var(--serif); font-size: 13px; color: var(--ink-3); margin-left: 4px; }
+  .hero-cmd.copied { border-color: var(--green); }
+  .hero-cmd.copied .hint::after { content: " — copied"; color: var(--green); }
 
   .btn { font-family: var(--serif); font-size: 15px; border-radius: 999px; padding: 13px 28px; cursor: pointer;
     border: 1.5px solid var(--ink); display: inline-flex; align-items: center; gap: 9px; transition: .15s, transform .1s; }
@@ -202,7 +211,7 @@
   <!-- ===== TOP BAR ===== -->
   <div class="topbar">
     <div class="row">
-      <span class="brandline">Open source · <b>github.com/caezium/Burrow</b> · v0.4.0</span>
+      <span class="brandline">Open source · <b>github.com/caezium/Burrow</b> · v0.5.1</span>
       <span class="links">
         <a href="#install">Install</a>
         <a href="https://github.com/caezium/Burrow" target="_blank" rel="noopener" aria-label="GitHub">
@@ -229,9 +238,13 @@
       macOS&nbsp;14+
     </div>
     <div class="cta">
-      <a class="btn btn-fill" href="https://github.com/caezium/Burrow/releases/latest" target="_blank" rel="noopener">Download</a>
-      <a class="btn btn-out" href="https://github.com/caezium/Burrow" target="_blank" rel="noopener">View on GitHub</a>
+      <a class="btn btn-fill" href="#install">Install with Homebrew</a>
+      <a class="btn btn-out" href="https://github.com/caezium/Burrow/releases/latest" target="_blank" rel="noopener">Download&nbsp;.zip</a>
     </div>
+    <button class="hero-cmd" id="brewcmd" type="button" aria-label="Copy install command">
+      <span class="dollar">$</span><span class="txt">brew install --cask caezium/tap/burrow</span>
+      <span class="hint">click to copy · pulls in <span class="cmd">mole</span> &amp; clears quarantine</span>
+    </button>
   </header>
 
   <hr class="rule">
@@ -437,6 +450,14 @@
       nm.innerHTML = p.dataset.name;
       tg.textContent = p.dataset.tag;
     });
+  });
+
+  var bc = document.getElementById('brewcmd');
+  if (bc) bc.addEventListener('click', function () {
+    var cmd = 'brew install --cask caezium/tap/burrow';
+    if (navigator.clipboard) { navigator.clipboard.writeText(cmd).catch(function(){}); }
+    bc.classList.add('copied');
+    setTimeout(function () { bc.classList.remove('copied'); }, 1400);
   });
 </script>
 </body>
