@@ -249,9 +249,11 @@ final class PrivilegedSession: MoTransport {
         }
         authRef = auth
 
-        // script -q /dev/null /bin/sh -c "HOME='…' exec '…/mo' <sub>"
+        // script -q /dev/null /bin/sh -c "HOME='…' TERM=… exec '…/mo' <sub>"
+        // TERM matters: without it mo's TUI degrades to non-interactive and finds
+        // nothing. HOME so it scans the user's dirs, not root's.
         func q(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
-        let inner = "HOME=\(q(home)) exec \(q(mo)) \(subcommand)"
+        let inner = "HOME=\(q(home)) TERM=xterm-256color exec \(q(mo)) \(subcommand)"
         let argStrings = ["-q", "/dev/null", "/bin/sh", "-c", inner]
         var cArgs: [UnsafeMutablePointer<CChar>?] = argStrings.map { strdup($0) }
         cArgs.append(nil)

@@ -39,7 +39,13 @@ final class MoInteractiveRunner: ObservableObject {
     private var confirmScreen = ""       // output between the first and second Enter
     private var wantedCount = 0          // how many we intend to remove (verified on the confirm screen)
 
-    init(subcommand: String, title: String) { self.subcommand = subcommand; self.title = title }
+    init(subcommand: String, title: String) {
+        self.subcommand = subcommand; self.title = title
+        // Writing a keystroke to a pty/pipe whose child has already exited raises
+        // SIGPIPE, which would kill the app (try? can't catch a signal). Ignore it
+        // process-wide; writes then fail with EPIPE instead, which we swallow.
+        signal(SIGPIPE, SIG_IGN)
+    }
 
     /// (Re)start the scan from a clean slate by driving `mo <subcommand>` in a
     /// pseudo-terminal. With `elevated`, run mo as ROOT through the system auth
@@ -174,9 +180,14 @@ final class MoInteractiveRunner: ObservableObject {
     }
 
     func cancel() {
-        transport?.stopReading()
-        transport?.send(MoTUI.quit)
-        transport?.terminate()
+        // Tear down without writing to the child: if it already exited, a 'quit'
+        // keystroke would hit a dead pipe. terminate() closes it cleanly (and for
+        // a still-running tool, EOF on its input makes it quit). Drop the handle
+        // so nothing touches it again.
+        let t = transport
+        transport = nil
+        t?.stopReading()
+        t?.terminate()
         switch phase { case .done, .failed: break; default: phase = .done(130) }
     }
 
