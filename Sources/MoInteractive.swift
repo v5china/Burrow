@@ -207,9 +207,25 @@ final class PTYTask: PTYPort {
         }
         let m = FileHandle(fileDescriptor: amaster, closeOnDealloc: true)
         m.readabilityHandler = { [weak self] h in
+            guard let self else { return }
             let d = h.availableData
-            guard !d.isEmpty, let s = String(data: d, encoding: .utf8) else { return }
-            DispatchQueue.main.async { self?.onOutput?(s) }
+            if d.isEmpty {
+                // EOF: the child closed the pty (it exited). Stop reading — left
+                // armed, an empty-data handler spins in a tight loop and starves
+                // the process's terminationHandler, so the exit would never be
+                // reported and the UI would hang (e.g. when Mole finds nothing and
+                // exits before the chooser). If the process is already reaped,
+                // report the exit ourselves; otherwise the now-unstarved
+                // terminationHandler will.
+                h.readabilityHandler = nil
+                if !self.proc.isRunning {
+                    let code = self.proc.terminationStatus
+                    DispatchQueue.main.async { self.onExit?(code) }
+                }
+                return
+            }
+            guard let s = String(data: d, encoding: .utf8) else { return }
+            DispatchQueue.main.async { self.onOutput?(s) }
         }
         master = m
         // Close the parent's slave fd whether or not the launch succeeds — on a

@@ -44,6 +44,19 @@ final class MoInteractiveHostTests: XCTestCase {
     \u{2191}\u{2193}  |  Space Select  |  Enter Confirm  |  A All  |  I Invert  |  Q Quit
     """
 
+    /// Regression: a child that prints then exits must deliver `onExit`. A pty
+    /// at EOF fires the readability handler with empty data forever; if we don't
+    /// disarm it, that spin starves the process terminationHandler and the exit
+    /// is never reported — the UI hangs on "Scanning…" when Mole finds nothing.
+    func testPTYTask_reportsExitWhenChildExitsImmediately() {
+        let pty = PTYTask()
+        let exited = expectation(description: "onExit fires")
+        pty.onOutput = { _ in }
+        pty.onExit = { _ in exited.fulfill() }
+        try? pty.launch("/bin/echo", ["hi"])   // prints, then exits → pty EOF
+        wait(for: [exited], timeout: 5)
+    }
+
     func testHost_scanSelectConfirm_drivesKeystrokesAndFinishes() throws {
         try XCTSkipUnless(MoleCLI.findExecutable() != nil, "needs `mo` on PATH to launch the pty")
 
