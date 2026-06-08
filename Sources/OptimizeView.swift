@@ -21,7 +21,7 @@ struct OptimizeView: View {
             if pendingRun != nil {
                 FullDiskAccessRequired(
                     accent: Tool.optimize.accent,
-                    onRecheck: { if Privacy.hasFullDiskAccess() { runPending(elevate: false) } },
+                    onRecheck: { if Privacy.hasFullDiskAccess() { runPending(elevate: false); return true }; return false },
                     onRunAnyway: { runPending(elevate: true) },
                     onCancel: { pendingRun = nil })
             } else {

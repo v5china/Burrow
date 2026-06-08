@@ -63,6 +63,20 @@ enum Privacy {
     static func openFullDiskAccessSettings() {
         NSWorkspace.shared.open(fullDiskAccessSettingsURL)
     }
+
+    /// Relaunch Burrow. macOS binds a Full Disk Access grant to the app at
+    /// process launch, so a grant flipped on while the app is running often
+    /// isn't visible to the live process — quitting and reopening is the
+    /// reliable way to pick it up. Spawns a fresh instance, then terminates
+    /// this one once the new one is on its way.
+    static func relaunch() {
+        let url = Bundle.main.bundleURL
+        let config = NSWorkspace.OpenConfiguration()
+        config.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: url, configuration: config) { _, _ in
+            DispatchQueue.main.async { NSApp.terminate(nil) }
+        }
+    }
 }
 
 /// Dismissible banner shown before scans that walk TCC-protected
@@ -119,9 +133,16 @@ struct FullDiskAccessNotice: View {
 struct FullDiskAccessRequired: View {
     var accent: Color
     var onOpenSettings: () -> Void = { Privacy.openFullDiskAccessSettings() }
-    var onRecheck: () -> Void
+    /// Re-probe access. Returns `true` when access is now visible (the
+    /// parent proceeds with the scan and navigates away); `false` keeps us
+    /// on the gate and reveals the relaunch hint — macOS frequently only
+    /// applies a freshly-flipped grant at the app's next launch.
+    var onRecheck: () -> Bool
     var onRunAnyway: () -> Void
     var onCancel: () -> Void
+    var onRelaunch: () -> Void = { Privacy.relaunch() }
+
+    @State private var stillBlocked = false
 
     var body: some View {
         VStack(spacing: 16) {
@@ -141,12 +162,23 @@ struct FullDiskAccessRequired: View {
             VStack(spacing: 12) {
                 PillButton(title: "Open Full Disk Access settings") { onOpenSettings() }
                 HStack(spacing: 18) {
-                    Button("I've granted it — scan") { onRecheck() }
+                    Button("I've granted it — scan") { stillBlocked = !onRecheck() }
                         .buttonStyle(.plain).font(Brand.sans(12, .semibold)).foregroundStyle(accent)
                     Button("Scan with admin") { onRunAnyway() }
                         .buttonStyle(.plain).font(Brand.mono(11)).foregroundStyle(Brand.textSecondary)
                     Button("Cancel") { onCancel() }
                         .buttonStyle(.plain).font(Brand.mono(11)).foregroundStyle(Brand.textTertiary)
+                }
+                if stillBlocked {
+                    VStack(spacing: 6) {
+                        Text("Still blocked? macOS only applies Full Disk Access the next time Burrow launches. Quit and reopen, then scan.")
+                            .font(Brand.mono(10)).foregroundStyle(Brand.textTertiary)
+                            .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: 420)
+                        Button("Quit & Reopen Burrow") { onRelaunch() }
+                            .buttonStyle(.plain).font(Brand.sans(11, .semibold)).foregroundStyle(accent)
+                    }
+                    .padding(.top, 4)
                 }
             }
             Spacer(); Spacer()

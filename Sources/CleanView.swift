@@ -24,7 +24,7 @@ struct CleanView: View {
             if pendingRun != nil {
                 FullDiskAccessRequired(
                     accent: Tool.clean.accent,
-                    onRecheck: { if Privacy.hasFullDiskAccess() { runPending(elevate: false) } },
+                    onRecheck: { if Privacy.hasFullDiskAccess() { runPending(elevate: false); return true }; return false },
                     onRunAnyway: { runPending(elevate: true) },   // root bypasses TCC → no flood
                     onCancel: { pendingRun = nil })
             } else {
