@@ -57,6 +57,24 @@ final class MoInteractiveHostTests: XCTestCase {
         wait(for: [exited], timeout: 5)
     }
 
+    /// Regression: a rescan calls launch() again on the same PTYTask. A Process
+    /// can only run once, so the second launch must spin up a FRESH child and
+    /// report its exit too — reusing the old one left the rescan with a dead
+    /// child and the UI hung on "Scanning…".
+    func testPTYTask_relaunchAfterChildExits_stillReportsExit() {
+        let pty = PTYTask()
+        pty.onOutput = { _ in }
+        let first = expectation(description: "first exit")
+        pty.onExit = { _ in first.fulfill() }
+        try? pty.launch("/bin/echo", ["one"])
+        wait(for: [first], timeout: 5)
+
+        let second = expectation(description: "second exit")
+        pty.onExit = { _ in second.fulfill() }
+        try? pty.launch("/bin/echo", ["two"])
+        wait(for: [second], timeout: 5)
+    }
+
     func testHost_scanSelectConfirm_drivesKeystrokesAndFinishes() throws {
         try XCTSkipUnless(MoleCLI.findExecutable() != nil, "needs `mo` on PATH to launch the pty")
 

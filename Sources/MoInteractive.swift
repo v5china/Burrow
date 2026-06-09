@@ -171,7 +171,7 @@ enum MoTUI {
 /// owns its read loop and delivers output/exit on the main thread so the host
 /// reducer stays single-threaded. The only impure seam — kept tiny.
 final class PTYTask: PTYPort {
-    private let proc = Process()
+    private var proc = Process()   // replaced on each launch (a Process runs once)
     private var master: FileHandle?
 
     var onOutput: ((String) -> Void)?
@@ -185,6 +185,10 @@ final class PTYTask: PTYPort {
     init(cols: UInt16 = 120, rows: UInt16 = 60) { self.cols = cols; self.rows = rows }
 
     func launch(_ executable: String, _ args: [String]) throws {
+        // A Process can only be run ONCE; a rescan calls launch again, so start
+        // from a fresh instance each time. (Reusing the old one left the second
+        // scan with a dead, never-spawning child — the UI hung on "Scanning…".)
+        proc = Process()
         var amaster: Int32 = 0
         var aslave: Int32 = 0
         var ws = winsize(ws_row: rows, ws_col: cols, ws_xpixel: 0, ws_ypixel: 0)
