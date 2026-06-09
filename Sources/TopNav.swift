@@ -22,10 +22,7 @@ struct TopNav: View {
 
     private var toolGroup: some View {
         HStack(spacing: 2) {
-            BurrowMark()
-                .frame(width: 24, height: 24)
-                .padding(.leading, 6)
-                .padding(.trailing, 4)
+            homeButton
             ForEach(Tool.navOrder) { tool in
                 tab(tool)
             }
@@ -35,10 +32,28 @@ struct TopNav: View {
         .overlay(Capsule(style: .continuous).strokeBorder(Brand.hairline, lineWidth: 1))
     }
 
+    /// The Burrow mark doubles as Home — the live dashboard (Overview /
+    /// History / Activity). It gets a soft ring when Home is selected.
+    private var homeButton: some View {
+        let isOn = selected == .home
+        return Button {
+            withAnimation(.easeOut(duration: 0.16)) { selected = .home }
+        } label: {
+            BurrowMark()
+                .frame(width: 24, height: 24)
+                .padding(4)
+                .background { if isOn { Circle().fill(Color.white.opacity(0.14)) } }
+                .overlay { if isOn { Circle().strokeBorder(Brand.cream.opacity(0.5), lineWidth: 1.5) } }
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help(NSLocalizedString("Home", comment: ""))
+        .padding(.leading, 2)
+        .padding(.trailing, 2)
+    }
+
     private var utilityGroup: some View {
         HStack(spacing: 2) {
-            utility("list.bullet.rectangle", pane: .activity)
-            utility("clock.arrow.circlepath", pane: .history)
             utility("gearshape", pane: .settings)
         }
         .padding(4)

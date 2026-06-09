@@ -16,17 +16,12 @@ import SwiftUI
 import AppKit
 import Combine
 
+/// The Overview section of Home: live metric cards + the process table.
 struct StatusView: View {
     @StateObject private var model: StatusModel
-    private let db: DB
-    var onNavigate: (Pane) -> Void
 
-    @State private var showExplain = false
-
-    init(db: DB, sampler: Sampler, onNavigate: @escaping (Pane) -> Void = { _ in }) {
+    init(db: DB, sampler: Sampler) {
         _model = StateObject(wrappedValue: StatusModel(db: db, sampler: sampler))
-        self.db = db
-        self.onNavigate = onNavigate
     }
 
     private let row1H: CGFloat = 150
@@ -36,7 +31,6 @@ struct StatusView: View {
         ScrollView {
             VStack(spacing: 13) {
                 if let s = model.snap {
-                    if Store.aiEnabled { explainBar }
                     HStack(spacing: 13) {
                         HealthCard(s: s, minHeight: row1H)
                         cpuTile(s).frame(minHeight: row1H)
@@ -61,27 +55,6 @@ struct StatusView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { model.start() }
         .onDisappear { model.stop() }
-        .sheet(isPresented: $showExplain) {
-            ExplainView(db: db,
-                        onNavigate: { showExplain = false; onNavigate($0) },
-                        onClose: { showExplain = false })
-        }
-    }
-
-    /// Opt-in "Explain" entry point (Status pane). Hidden unless the AI
-    /// lens is enabled in Settings.
-    private var explainBar: some View {
-        HStack {
-            Spacer()
-            Button { showExplain = true } label: {
-                Label("Explain", systemImage: "sparkles")
-                    .font(Brand.mono(11, .semibold)).foregroundStyle(Tool.status.accent)
-                    .padding(.horizontal, 12).padding(.vertical, 6)
-                    .background(Capsule().fill(Tool.status.accent.opacity(0.12)))
-                    .overlay(Capsule().strokeBorder(Tool.status.accent.opacity(0.30), lineWidth: 1))
-            }
-            .buttonStyle(.plain)
-        }
     }
 
     private var waiting: some View {
