@@ -14,6 +14,7 @@
 
 import SwiftUI
 import AppKit
+import Combine
 
 struct StatusView: View {
     @StateObject private var model: StatusModel
@@ -140,9 +141,13 @@ struct StatusView: View {
     }
 
     private func netTile(_ s: MoleStatus) -> MetricTile {
-        let net = s.network.first(where: { !$0.ip.isEmpty }) ?? s.network.first
-        let rx = net?.rxRateMbs ?? 0
-        let tx = net?.txRateMbs ?? 0
+        let snapNet = s.network.first(where: { !$0.ip.isEmpty }) ?? s.network.first
+        // Prefer the native 1 s monitor (catches bursts the mo poll misses); the
+        // mo snapshot is the fallback before the monitor has any samples.
+        let live = model.net
+        let useLive = !live.history.isEmpty
+        let rx = useLive ? live.rxMBs : (snapNet?.rxRateMbs ?? 0)
+        let tx = useLive ? live.txMBs : (snapNet?.txRateMbs ?? 0)
         let total = rx + tx
         let value: String
         let unit: String
@@ -153,8 +158,8 @@ struct StatusView: View {
         return MetricTile(
             eyebrow: "Network", glyph: "network", accent: Brand.green,
             value: value, unit: unit, chip: chip,
-            values: model.netHist, chartStyle: .area,
-            footnote: "↓ \(rate(rx))  ↑ \(rate(tx)) · \(net?.name ?? "—") · \(net?.ip ?? "—")")
+            values: useLive ? live.history : model.netHist, chartStyle: .area,
+            footnote: "↓ \(rate(rx))  ↑ \(rate(tx)) · \(snapNet?.name ?? "—") · \(snapNet?.ip ?? "—")")
     }
 
     private func rate(_ mbs: Double) -> String {
@@ -527,10 +532,14 @@ final class StatusModel: ObservableObject {
     @Published var sortAsc = false
     @Published var pinned: Set<Int> = []
 
+    /// Native 1 s network throughput — its bursts are too fast for the mo poll.
+    let net = NetworkMonitor()
+
     private let db: DB
     private let sampler: Sampler
     private var liveTimer: Timer?
     private var histTimer: Timer?
+    private var netSub: AnyCancellable?
 
     init(db: DB, sampler: Sampler) {
         self.db = db
@@ -540,6 +549,10 @@ final class StatusModel: ObservableObject {
     func start() {
         refreshCurrent()
         refreshHistory()
+        net.start()
+        // Re-publish on the monitor's 1 s updates so the network tile refreshes
+        // between the 2 s live ticks.
+        netSub = net.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
         liveTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refreshCurrent() }
         }
@@ -551,6 +564,7 @@ final class StatusModel: ObservableObject {
     func stop() {
         liveTimer?.invalidate(); liveTimer = nil
         histTimer?.invalidate(); histTimer = nil
+        net.stop(); netSub = nil
     }
 
     func setSort(_ key: ProcSort) {
