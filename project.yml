@@ -25,13 +25,17 @@ settings:
 # Both are inert unless a release injects keys (see the per-target settings
 # below): a plain `xcodegen + xcodebuild` dev build ships with empty keys and
 # never touches either network.
+# Pinned EXACTLY (not `from:`): the .xcodeproj — and with it the only
+# Package.resolved — is gitignored, so a range would let every CI release
+# resolve whatever the latest compatible SDK is at build time. Exact pins
+# keep releases reproducible from a tag; bump deliberately.
 packages:
   PostHog:
     url: https://github.com/PostHog/posthog-ios
-    from: 3.59.0
+    exactVersion: 3.59.3
   Sentry:
     url: https://github.com/getsentry/sentry-cocoa
-    from: 9.16.0
+    exactVersion: 9.16.1
 
 targets:
   Burrow:

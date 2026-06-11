@@ -17,7 +17,11 @@
 import Foundation
 
 enum Store {
-    private static let d = UserDefaults.standard
+    /// Backing defaults. A `var` so the test suite can swap in a scratch
+    /// suite: the test bundle is hosted inside the real app (TEST_HOST), so
+    /// `.standard` IS the developer's live dev.caezium.Burrow domain and
+    /// must never absorb test writes.
+    static var d: UserDefaults = .standard
 
     /// Persist a value AND flush it to disk immediately. UserDefaults writes
     /// are normally batched by cfprefsd, so a setting changed seconds before
@@ -29,7 +33,7 @@ enum Store {
         d.synchronize()
     }
 
-    // MARK: - Sampler
+    // MARK: - Sampling
 
     /// Seconds between `mo status --json` invocations. Clamp to [5, 3600]
     /// because below 5 the subprocess overhead dominates, and above an
@@ -150,11 +154,24 @@ enum Store {
 
     /// Optional Bearer API key for the OpenAI-compatible endpoint. Leave
     /// blank for LM Studio / local servers that don't check it; required
-    /// for hosted APIs (e.g. OpenAI). Stored in UserDefaults — fine for a
-    /// localhost key; move to Keychain before shipping cloud keys.
+    /// for hosted APIs (e.g. OpenAI). Lives in the KEYCHAIN — defaults
+    /// would store a cloud credential world-readable in a plist. Reads
+    /// migrate any legacy defaults-stored key over once, then delete it.
     static var aiOpenAIKey: String {
-        get { d.string(forKey: "ai_openai_key") ?? "" }
-        set { d.set(newValue, forKey: "ai_openai_key") }
+        get {
+            if let k = KeychainStore.string(for: "ai_openai_key") { return k }
+            // One-time migration: versions ≤0.6.5 kept the key in defaults.
+            let legacy = d.string(forKey: "ai_openai_key") ?? ""
+            if !legacy.isEmpty {
+                KeychainStore.set(legacy, for: "ai_openai_key")
+                d.removeObject(forKey: "ai_openai_key")
+            }
+            return legacy
+        }
+        set {
+            KeychainStore.set(newValue, for: "ai_openai_key")
+            d.removeObject(forKey: "ai_openai_key")   // never reintroduce the plist copy
+        }
     }
 
     // MARK: - MCP / QueryServer
@@ -191,6 +208,11 @@ enum Store {
     /// UserDefaults snapshot) to see a toggle the GUI just flipped.
     static var mcpActionsEnabled: Bool {
         get {
+            // The cross-process cfprefsd read only makes sense against the
+            // real domain; an injected scratch suite (tests) reads directly.
+            guard d === UserDefaults.standard else {
+                return d.object(forKey: mcpActionsEnabledKey) as? Bool ?? false
+            }
             CFPreferencesAppSynchronize(kCFPreferencesCurrentApplication)
             if let v = CFPreferencesCopyAppValue(mcpActionsEnabledKey as CFString,
                                                  kCFPreferencesCurrentApplication) as? Bool {
@@ -200,6 +222,33 @@ enum Store {
         }
         set {
             d.set(newValue, forKey: mcpActionsEnabledKey)
+            d.synchronize()
+        }
+    }
+
+    /// Key for the irreversible-action opt-in (see `mcpIrreversibleEnabled`).
+    static let mcpIrreversibleEnabledKey = "mcp_irreversible_enabled"
+
+    /// Second key for IRREVERSIBLE agent actions: `uninstall` (and its
+    /// `permanent: true`, which bypasses the Trash). `mcpActionsEnabled`
+    /// covers cleanups a user can recover from; these they can't, so they
+    /// need their own explicit switch. OFF by default. Cross-process read
+    /// like its sibling — the MCP subprocess must see a toggle the GUI
+    /// just flipped.
+    static var mcpIrreversibleEnabled: Bool {
+        get {
+            guard d === UserDefaults.standard else {
+                return d.object(forKey: mcpIrreversibleEnabledKey) as? Bool ?? false
+            }
+            CFPreferencesAppSynchronize(kCFPreferencesCurrentApplication)
+            if let v = CFPreferencesCopyAppValue(mcpIrreversibleEnabledKey as CFString,
+                                                 kCFPreferencesCurrentApplication) as? Bool {
+                return v
+            }
+            return false
+        }
+        set {
+            d.set(newValue, forKey: mcpIrreversibleEnabledKey)
             d.synchronize()
         }
     }
@@ -225,6 +274,13 @@ enum Store {
     static var telemetryEnabled: Bool {
         get { d.object(forKey: "telemetry_enabled") as? Bool ?? true }
         set { write(newValue, "telemetry_enabled") }
+    }
+
+    /// Whether the one-time first-launch telemetry notice has been shown
+    /// and answered (release builds only — keyless builds never ask).
+    static var telemetryNoticeAcknowledged: Bool {
+        get { d.object(forKey: "telemetry_notice_ack") as? Bool ?? false }
+        set { write(newValue, "telemetry_notice_ack") }
     }
 
     // MARK: - History view

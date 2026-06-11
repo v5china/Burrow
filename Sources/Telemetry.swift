@@ -33,6 +33,22 @@ enum Telemetry {
     /// One-time guard so a stray second `start()` can't re-init the SDK.
     private static var started = false
 
+    /// True once `PostHogSDK.setup` actually ran — i.e. a release key was
+    /// present. `started` alone is set even in keyless dev builds, where
+    /// calling into the never-configured SDK would only produce console
+    /// warnings; every PostHog call below is gated on BOTH.
+    private static var configured = false
+
+    /// Whether this build carries release-injected telemetry keys at all.
+    /// Used by the first-launch consent notice: a source/dev build can't
+    /// send anything, so it shouldn't ask.
+    static var hasReleaseKeys: Bool {
+        let info = Bundle.main.infoDictionary
+        let key = (info?["PHPostHogApiKey"] as? String) ?? ""
+        let dsn = (info?["SentryDSN"] as? String) ?? ""
+        return !key.isEmpty || !dsn.isEmpty
+    }
+
     /// The single opt-in switch, persisted in `Store`. Reused as the gate for
     /// both PostHog and Sentry.
     static var isEnabled: Bool {
@@ -68,6 +84,7 @@ enum Telemetry {
         // network call at every launch that TELEMETRY.md doesn't list.
         config.preloadFeatureFlags = false
         PostHogSDK.shared.setup(config)
+        configured = true
 
         guard isEnabled else { return }
         registerSuperProperties()
@@ -76,7 +93,7 @@ enum Telemetry {
 
     /// Best-effort flush on quit so the final session's events aren't lost.
     static func flush() {
-        guard started, isEnabled else { return }
+        guard configured, isEnabled else { return }
         PostHogSDK.shared.flush()
     }
 
@@ -86,7 +103,7 @@ enum Telemetry {
     /// pass already-bucketed values (see the `*Bucket` helpers) for anything
     /// derived from sizes, counts, or durations.
     static func capture(_ event: String, _ props: [String: Any] = [:]) {
-        guard started, isEnabled else { return }
+        guard configured, isEnabled else { return }
         PostHogSDK.shared.capture(event, properties: sanitize(props))
     }
 
@@ -99,9 +116,13 @@ enum Telemetry {
         isEnabled = enabled
         CrashReporter.setEnabled(enabled)
 
-        guard started else { return }
+        guard configured else { return }
         if enabled {
             PostHogSDK.shared.optIn()
+            // start() only registers these when launched enabled — an
+            // opt-in mid-session must add them too, or every event until
+            // relaunch goes out missing the promised app/OS/arch context.
+            registerSuperProperties()
             if previous != enabled { capture("telemetry_opt_in_changed", ["enabled": true]) }
         } else {
             if previous != enabled {
@@ -182,10 +203,14 @@ enum Telemetry {
         var out: [String: Any] = [:]
         for (k, v) in props {
             if blocked.contains(k) { continue }
-            if v is String || v is Int || v is Int64 || v is Double || v is Bool {
+            if v is Int || v is Int64 || v is Double || v is Bool {
                 out[k] = v
             } else {
-                out[k] = String(describing: v)  // coerce simple enums to a label
+                // Strings (and coerced enum labels) get a value-level check
+                // too: a path smuggled under a non-blocked key must still
+                // never leave the Mac.
+                let s = (v as? String) ?? String(describing: v)
+                out[k] = s.contains("/Users/") ? "<redacted>" : s
             }
         }
         return out

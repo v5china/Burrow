@@ -258,7 +258,6 @@
 "MB/s" = "MB/s";
 "read" = "讀取";
 "write" = "寫入";
-"Network" = "網路";
 "rx" = "接收";
 "tx" = "傳送";
 "Thermal" = "溫度";
@@ -351,7 +350,6 @@
 "Local HTTP query server" = "本機 HTTP 查詢伺服器";
 "Enable the Explain lens" = "啟用解讀功能";
 "Enable HTTP query server" = "啟用 HTTP 查詢伺服器";
-"Endpoint" = "端點";
 "Let agents run cleanups for real" = "允許 AI 代理真正執行清理";
 "Backend" = "後端";
 "Base URL" = "基礎 URL";
@@ -393,3 +391,40 @@
 "Still blocked? macOS only applies Full Disk Access the next time Burrow launches. Quit and reopen, then scan." = "仍被阻擋？macOS 要等 Burrow 下次啟動才會套用完整磁碟取用權限。請結束並重新開啟 Burrow，再進行掃描。";
 "Burrow uses the Mole CLI (`mo`) for system metrics and cleanup. Install it with:\n\n    brew install mole\n\nThen relaunch Burrow." = "Burrow 使用 Mole CLI（`mo`）取得系統指標並執行清理。請安裝：\n\n    brew install mole\n\n然後重新啟動 Burrow。";
 "Quit" = "結束";
+
+/* ===== parity backfill (2026-06): audit/consent/installer strings (zh-Hant, Taiwan) ===== */
+"Anonymous usage" = "匿名使用情況";
+"Share anonymous usage & crash reports" = "分享匿名使用情況與當機報告";
+"Share anonymous usage & crash reports?" = "分享匿名使用情況與當機報告？";
+"Sends anonymous product analytics (PostHog) and crash reports (Sentry): a random install id (not tied to you or your hardware), the app + macOS version, CPU type, and which features you use — with sizes and counts bucketed. Never file names, contents, paths, or your metrics. It helps gauge retention and catch crashes. On by default; turn it off and both stop. Full list in TELEMETRY.md." = "傳送匿名產品分析（PostHog）與當機報告（Sentry）：一個隨機安裝 ID（與你本人和硬體無關）、應用程式與 macOS 版本、CPU 類型，以及你使用了哪些功能 — 大小與數量都按區間歸檔。絕不包含檔案名稱、檔案內容、路徑或你的指標資料。它用於了解留存並發現當機。預設開啟；關閉後兩者都會停止。完整列表見 TELEMETRY.md。";
+"Helps prioritize fixes: app/OS version, coarse bucketed feature counts, and crash traces. Never files, paths, file contents, or your metrics — the exact list is in TELEMETRY.md. You can change this anytime in Settings → Anonymous usage." = "協助確定修復優先順序：應用程式/系統版本、按區間歸檔的功能使用次數與當機記錄。絕不包含檔案、路徑、檔案內容或你的指標資料 — 完整列表見 TELEMETRY.md。可隨時在「設定 → 匿名使用情況」中變更。";
+"Share" = "分享";
+"Don't Share" = "不分享";
+"OFF by default. Agents can always read metrics and run dry-run previews. With this on, an agent can run a real `mo clean` / `optimize` — but ONLY when it also passes an explicit confirm flag, so a deletion is never one stray sentence away. Turn it off and agents are read-only again. Data stays on this Mac." = "預設關閉。代理始終可以讀取指標並執行預覽（dry-run）。開啟後，代理可以真正執行 `mo clean` / `optimize` — 但僅當它同時傳入明確的確認參數時才會執行，因此刪除絕不會因一句口誤而發生。關閉後代理恢復唯讀。資料保留在這台 Mac 上。";
+"Also allow uninstalls & permanent deletes" = "同時允許解除安裝與永久刪除";
+"A second key for what the Trash can't undo: real `mo uninstall`, and `permanent:true` deletes. Needs the cleanup switch above too; an uninstall also aborts unless mo matches exactly the requested apps." = "針對垃圾桶無法挽回的操作的第二道開關：真正的 `mo uninstall`，以及 `permanent:true` 的永久刪除。還需要上方的清理開關同時開啟；若 mo 比對到的應用程式與請求不完全一致，解除安裝也會中止。";
+"Uninstall aborted" = "解除安裝已中止";
+"mo's matcher didn't agree with your selection, so nothing was removed.\n\n%@" = "mo 比對到的應用程式與你的選擇不一致，因此未刪除任何內容。\n\n%@";
+"mo would also remove: %@" = "mo 還會額外刪除：%@";
+"mo did not match: %@" = "mo 未比對到：%@";
+"couldn't verify which apps mo matched" = "無法確認 mo 比對到了哪些應用程式";
+"aborted — matcher mismatch" = "已中止 — 比對不一致";
+"uninstall failed" = "解除安裝失敗";
+"OK" = "好";
+"done" = "完成";
+"failed" = "失敗";
+"select none" = "全部取消";
+"select all" = "全選";
+"Remove" = "刪除";
+"Remove (%lld)" = "刪除（%lld）";
+"Show all %lld" = "顯示全部 %lld 項";
+"Showing the %lld biggest of %lld." = "顯示 %2$lld 項中最大的 %1$lld 項。";
+"Loading all %lld… (%lld so far)" = "正在載入全部 %lld 項…（已載入 %lld 項）";
+"authorization cancelled" = "已取消授權";
+"Couldn't update Touch ID for sudo" = "無法更新 sudo 的 Touch ID";
+"`mo touchid %@` didn't complete (the password prompt may have been cancelled). You can also run it in a terminal." = "`mo touchid %@` 未完成（密碼提示可能已被取消）。你也可以在終端機中執行它。";
+"No Ollama model is set — pick one in Settings." = "尚未設定 Ollama 模型 — 請在設定中選擇一個。";
+"No model name is set for the OpenAI-compatible API — set one in Settings." = "尚未為 OpenAI 相容 API 設定模型名稱 — 請在設定中填寫。";
+"The API base URL isn't a valid http(s) URL — check it in Settings." = "API 基礎 URL 不是有效的 http(s) 位址 — 請在設定中檢查。";
+"%lld running" = "%lld 個執行中";
+"blank for LM Studio" = "LM Studio 留空";

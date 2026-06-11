@@ -8,7 +8,7 @@
 //       alert with the install command, then quit.
 //    2. Open the SQLite history DB.
 //    3. Start QueryServer (Store-gated).
-//    4. Start Sampler (Store-configured cadence).
+//    4. Start SnapshotProducer (Store-configured cadence).
 //    5. Start Maintenance (hourly prune).
 //    6. Install the NSStatusItem.
 //
@@ -24,31 +24,37 @@ import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// Singleton handle so SwiftUI views can reach the live
-    /// Maintenance / Sampler / DB without threading them through every
+    /// Maintenance / SnapshotProducer / DB without threading them through every
     /// initializer.
     static private(set) var shared: AppDelegate?
 
     private(set) var db: DB?
-    private(set) var sampler: Sampler?
+    private(set) var producer: SnapshotProducer?
     private(set) var maintenance: Maintenance?
     private var queryServer: QueryServer?
     private var statusBar: StatusBarController?
 
-    /// Single main window. Holds the sidebar + content router. The
-    /// `pendingInitialSection` is only used to pass the chosen tab
-    /// across the window-creation boundary; cleared once the window's
-    /// content view reads it.
+    /// Single main window. Holds the sidebar + content router.
     private var mainWC: NSWindowController?
-    fileprivate var pendingInitialPane: Pane = .home
 
     private var installWC: NSWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppDelegate.shared = self
 
+        // Under XCTest this process is only a TEST_HOST shell. Starting the
+        // real services would bind the query port, spawn `mo`, fire telemetry,
+        // and let the maintenance timer prune the developer's real history DB
+        // mid-suite. Stay inert; tests construct exactly what they need.
+        if Foundation.ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            return
+        }
+
         // Product analytics + crash reporting (PostHog + Sentry). Opt-out and
         // inert without release-injected keys. Started before the `mo` gate so
-        // a launch with the engine missing still counts.
+        // a launch with the engine missing still counts — but never before
+        // the user has seen the one-time consent notice below.
+        ensureTelemetryConsent()
         Telemetry.start()
 
         // No engine yet → guided install instead of a dead-end quit. The
@@ -59,6 +65,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
         startServices()
+    }
+
+    /// One-time first-launch notice (audit M9): telemetry is opt-out, but
+    /// the choice must be SEEN, not discoverable only via a Settings
+    /// footnote — and nothing may be sent before it. Keyless source/dev
+    /// builds skip the dialog (they can't send anything); the answer maps
+    /// straight onto the same switch Settings exposes.
+    private func ensureTelemetryConsent() {
+        guard Telemetry.hasReleaseKeys, !Store.telemetryNoticeAcknowledged else { return }
+        let alert = NSAlert()
+        alert.messageText = NSLocalizedString("Share anonymous usage & crash reports?", comment: "")
+        alert.informativeText = NSLocalizedString("""
+            Helps prioritize fixes: app/OS version, coarse bucketed feature counts, and crash traces. \
+            Never files, paths, file contents, or your metrics — the exact list is in TELEMETRY.md. \
+            You can change this anytime in Settings → Anonymous usage.
+            """, comment: "")
+        alert.addButton(withTitle: NSLocalizedString("Share", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Don't Share", comment: ""))
+        NSApp.activate(ignoringOtherApps: true)
+        Store.telemetryEnabled = (alert.runModal() == .alertFirstButtonReturn)
+        Store.telemetryNoticeAcknowledged = true
     }
 
     /// Guided onboarding window when `mo` is missing. Stays a regular Dock
@@ -110,22 +137,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self.queryServer?.start()
         }
 
-        let sampler = Sampler(db: db,
-                              intervalSeconds: TimeInterval(Store.sampleIntervalSeconds))
-        self.sampler = sampler
-        sampler.start()
-
-        // Always-on 1 s network + disk reader: feeds the live Home tiles AND the
-        // History charts so both update at the same (fast) cadence. (We're on the
-        // main thread at launch; assumeIsolated satisfies the @MainActor reader.)
-        MainActor.assumeIsolated { IOMonitor.shared.start() }
+        // One engine for everything metric-shaped: the periodic `mo status`
+        // snapshot (patched, persisted, published) AND the 1 s live net/disk
+        // feed for tiles and charts. See SnapshotProducer.swift.
+        let producer = SnapshotProducer(deps: .live(db: db))
+        self.producer = producer
+        producer.start()
 
         let maintenance = Maintenance(db: db)
         self.maintenance = maintenance
         maintenance.start()
 
         if Store.showMenuBarIcon {
-            self.statusBar = StatusBarController(db: db, sampler: sampler, delegate: self)
+            self.statusBar = StatusBarController(db: db, producer: producer, delegate: self)
         }
         self.setupMainMenu()
 
@@ -151,7 +175,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        self.sampler?.stop()
+        self.producer?.stop()
         self.queryServer?.stop()
         self.maintenance?.stop()
         Telemetry.capture("app_terminated")
@@ -169,18 +193,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// `openMainWindow(initial: .cleanup)` etc.
     @available(macOS 14.0, *)
     func openMainWindow(initial: Pane = .home) {
-        // If already open, just switch to the requested pane and bring
-        // the window forward.
+        // If already open, just switch to the requested pane and bring the
+        // window forward. NEVER reinstall the content view here — that
+        // would discard live tool state (a running clean's report, scan
+        // caches, purge selections) and orphan the old hosting tree's
+        // timers; the live RootView switches itself on the notification.
         if let wc = self.mainWC, let window = wc.window {
-            self.pendingInitialPane = initial
-            self.installMainContent(into: window, initial: initial)
+            NotificationCenter.default.post(name: .burrowSelectPane, object: initial)
+            NotificationCenter.default.post(name: .burrowWindowVisibility, object: true)
             NSApp.setActivationPolicy(.regular)   // Dock icon while open
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
 
-        guard self.db != nil, self.sampler != nil else { return }
+        guard self.db != nil, self.producer != nil else { return }
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1120, height: 740),
             styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView],
@@ -214,8 +241,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @available(macOS 14.0, *)
     private func installMainContent(into window: NSWindow, initial: Pane) {
-        guard let db = self.db, let sampler = self.sampler else { return }
-        let root = RootView(db: db, sampler: sampler, delegate: self, initialPane: initial)
+        guard let db = self.db, let producer = self.producer else { return }
+        let root = RootView(db: db, producer: producer, delegate: self, initialPane: initial)
         let host = NSHostingController(rootView: root)
         host.view.wantsLayer = true
         host.view.layer?.backgroundColor = .clear
@@ -233,8 +260,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if statusBar != nil {
             NSApp.setActivationPolicy(.accessory)
         }
-        // No live chart on screen → drop back to the idle sample cadence.
-        self.sampler?.setForeground(false)
+        // No live chart on screen → drop back to the idle sample cadence,
+        // and tell the kept-alive content to park its polling timers.
+        self.producer?.setForeground(false)
+        NotificationCenter.default.post(name: .burrowWindowVisibility, object: false)
     }
 
     /// Clicking the Dock icon (menu-bar-disabled mode) reopens the window.
@@ -242,6 +271,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// its default raise-windows behaviour rather than us suppressing it.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         guard !hasVisibleWindows else { return false }
+        // Services never started (mo still missing): the main window can't
+        // exist, so bring back the guided installer instead of leaving a
+        // Dock icon whose clicks do nothing.
+        if self.db == nil {
+            if let wc = self.installWC {
+                wc.showWindow(nil)
+                NSApp.activate(ignoringOtherApps: true)
+            } else {
+                self.showInstallWindow()
+            }
+            return true
+        }
         if #available(macOS 14, *) { self.openMainWindow(initial: .home) }
         return true
     }
@@ -252,10 +293,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// Installs/removes the status item, and when hiding it keeps a Dock
     /// presence + an open window so the app never becomes unreachable.
     func applyMenuBarVisibility(_ show: Bool) {
-        guard let db = db, let sampler = sampler else { return }
+        guard let db = db, let producer = producer else { return }
         if show {
             if statusBar == nil {
-                statusBar = StatusBarController(db: db, sampler: sampler, delegate: self)
+                statusBar = StatusBarController(db: db, producer: producer, delegate: self)
             }
         } else {
             statusBar = nil   // StatusBarController.deinit removes the item

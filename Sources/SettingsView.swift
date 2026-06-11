@@ -21,6 +21,7 @@ struct SettingsView: View {
     @State private var queryServerEnabled: Bool = Store.queryServerEnabled
     @State private var telemetryEnabled: Bool = Store.telemetryEnabled
     @State private var mcpActionsEnabled: Bool = Store.mcpActionsEnabled
+    @State private var mcpIrreversibleEnabled: Bool = Store.mcpIrreversibleEnabled
     @State private var showMenuBarIcon: Bool = Store.showMenuBarIcon
     @State private var aiEnabled: Bool = Store.aiEnabled
     @State private var aiProvider: String = Store.aiProvider
@@ -132,7 +133,12 @@ struct SettingsView: View {
                         toggleRow("Let agents run cleanups for real", isOn: $mcpActionsEnabled) {
                             Store.mcpActionsEnabled = $0
                         }
-                        footnote("OFF by default. Agents can always read metrics and run dry-run previews. With this on, an agent can run a real `mo clean` / `optimize` / `uninstall` — but ONLY when it also passes an explicit confirm flag, so a deletion is never one stray sentence away. Turn it off and agents are read-only again. Data stays on this Mac.")
+                        footnote("OFF by default. Agents can always read metrics and run dry-run previews. With this on, an agent can run a real `mo clean` / `optimize` — but ONLY when it also passes an explicit confirm flag, so a deletion is never one stray sentence away. Turn it off and agents are read-only again. Data stays on this Mac.")
+                        toggleRow("Also allow uninstalls & permanent deletes", isOn: $mcpIrreversibleEnabled) {
+                            Store.mcpIrreversibleEnabled = $0
+                        }
+                        .disabled(!mcpActionsEnabled)
+                        footnote("A second key for what the Trash can't undo: real `mo uninstall`, and `permanent:true` deletes. Needs the cleanup switch above too; an uninstall also aborts unless mo matches exactly the requested apps.")
                     }
 
                     section("Language", "globe") {
@@ -180,7 +186,7 @@ struct SettingsView: View {
                         } else {
                             aiField("Base URL", placeholder: "http://127.0.0.1:1234/v1", text: $aiOpenAIBaseURL) { Store.aiOpenAIBaseURL = $0 }
                             aiField("Model", placeholder: "local-model", text: $aiOpenAIModel) { Store.aiOpenAIModel = $0 }
-                            aiField("API key (optional)", placeholder: "blank for LM Studio", text: $aiOpenAIKey) { Store.aiOpenAIKey = $0 }
+                            aiField("API key (optional)", placeholder: "blank for LM Studio", text: $aiOpenAIKey, secure: true) { Store.aiOpenAIKey = $0 }
                             footnote("Any OpenAI-compatible server. For LM Studio: load a model, open Developer ▸ Start Server, and leave the key blank — the default URL is already LM Studio's. A hosted endpoint (e.g. OpenAI) needs a key and sends the metrics summary off-device (never file contents).")
                         }
                         footnote("Adds an \u{201C}Explain\u{201D} button to Status that reads your latest snapshot and explains it in plain English, optionally suggesting Clean/Purge/Installers.")
@@ -256,7 +262,7 @@ struct SettingsView: View {
         DispatchQueue.global(qos: .userInitiated).async {
             let res = try? MoleCLI.run(args: ["touchid", "status"], timeout: 15)
             // Strip ANSI colour codes Mole wraps the status line in before matching.
-            let out = CommandRunner.stripAnsi(res?.stdout ?? "").lowercased()
+            let out = Ansi.strip(res?.stdout ?? "").lowercased()
             let enabled = out.contains("is enabled")
             DispatchQueue.main.async {
                 touchIDAvailable = available
@@ -278,8 +284,8 @@ struct SettingsView: View {
                 loadTouchIDStatus()
                 if code != 0 {
                     let alert = NSAlert()
-                    alert.messageText = "Couldn't update Touch ID for sudo"
-                    alert.informativeText = "`mo touchid \(cmd)` didn't complete (the password prompt may have been cancelled). You can also run it in a terminal."
+                    alert.messageText = NSLocalizedString("Couldn't update Touch ID for sudo", comment: "")
+                    alert.informativeText = String(format: NSLocalizedString("`mo touchid %@` didn't complete (the password prompt may have been cancelled). You can also run it in a terminal.", comment: ""), cmd)
                     alert.runModal()
                 }
             }
@@ -404,15 +410,28 @@ struct SettingsView: View {
 
     /// Trailing-aligned text-field row that persists on every keystroke, so
     /// closing Settings never loses an in-progress edit.
-    private func aiField(_ label: String, placeholder: String, text: Binding<String>,
+    // LocalizedStringKey (not String): a String label/placeholder reaches the
+    // verbatim Text/TextField overload and skips localization. Example-value
+    // placeholders (model ids, the LM Studio URL) simply have no translation
+    // and fall back to themselves.
+    private func aiField(_ label: LocalizedStringKey, placeholder: LocalizedStringKey,
+                         text: Binding<String>, secure: Bool = false,
                          onChange: @escaping (String) -> Void) -> some View {
         HStack {
             Text(label).font(Brand.sans(12)).foregroundStyle(Brand.textPrimary)
             Spacer()
-            TextField(placeholder, text: text)
-                .textFieldStyle(.plain).font(Brand.mono(11))
-                .multilineTextAlignment(.trailing).frame(width: 200)
-                .onChange(of: text.wrappedValue) { _, v in onChange(v) }
+            Group {
+                // Secrets (the hosted-API key) render masked so a screen
+                // share or screenshot doesn't leak them.
+                if secure {
+                    SecureField(placeholder, text: text)
+                } else {
+                    TextField(placeholder, text: text)
+                }
+            }
+            .textFieldStyle(.plain).font(Brand.mono(11))
+            .multilineTextAlignment(.trailing).frame(width: 200)
+            .onChange(of: text.wrappedValue) { _, v in onChange(v) }
         }
     }
 

@@ -13,10 +13,14 @@ REPO="${REPO:-caezium/Burrow}"
 
 fetch() {
   if command -v gh >/dev/null 2>&1; then
-    gh api --paginate "repos/$REPO/releases" 2>/dev/null
-  else
-    curl -fsSL "https://api.github.com/repos/$REPO/releases?per_page=100"
+    # gh that's installed but unauthenticated/rate-limited exits non-zero;
+    # fall through to anonymous curl instead of dying under `set -e`.
+    if out=$(gh api --paginate "repos/$REPO/releases" 2>/dev/null); then
+      printf '%s' "$out"
+      return
+    fi
   fi
+  curl -fsSL "https://api.github.com/repos/$REPO/releases?per_page=100"
 }
 
 command -v jq >/dev/null 2>&1 || { echo "needs jq (brew install jq)" >&2; exit 1; }

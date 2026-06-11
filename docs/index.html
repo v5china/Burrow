@@ -12,15 +12,24 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="Burrow · Free, open-source native Mac utility">
 <meta property="og:description" content="Clean junk, manage apps, run maintenance, map your disk, and watch live status — in one native Mac app. Free and MIT-licensed. Plus history and an MCP server.">
-<meta property="og:image" content="burrow-icon-512.png">
+<meta property="og:image" content="https://caezium.github.io/Burrow/burrow-icon-512.png">
 <meta property="og:url" content="https://caezium.github.io/Burrow/">
 <meta name="twitter:card" content="summary">
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
-
 <style>
+  /* All fonts self-hosted: a page whose pitch is "your data stays on your
+     Mac" shouldn't leak every visitor's IP to a fonts CDN. Geist + Geist
+     Mono are the MIT-licensed variable cuts from vercel/geist-font. */
+  @font-face {
+    font-family: "Geist";
+    src: url("assets/fonts/Geist[wght].woff2") format("woff2");
+    font-weight: 100 900; font-style: normal; font-display: swap;
+  }
+  @font-face {
+    font-family: "Geist Mono";
+    src: url("assets/fonts/GeistMono[wght].woff2") format("woff2");
+    font-weight: 100 900; font-style: normal; font-display: swap;
+  }
   /* Cal Sans — caezium house display face (self-hosted) */
   @font-face {
     font-family: "Cal Sans";
