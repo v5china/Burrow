@@ -336,3 +336,11 @@ design system); Settings, History, and Activity are panes in that same window.
   [Stats fork](https://github.com/caezium/stats) (`caezium/stats@henry/history-mcp`).
 - Treemap layout: Bruls, Huijsen & van Wijk (2000), "Squarified Treemaps,"
   re-implemented from scratch in Swift.
+
+## What's Next & Contributing
+
+**Continuous Updates & Windows Support:** 
+Burrow is in active development! We will continuously roll out new updates, features, and improvements. We are also actively working on bringing Burrow to **Windows** in the near future!
+
+**Become a Contributor:** 
+Burrow is a community-driven project, and we would absolutely love your help to shape its future. Whether it's fixing bugs, building new features, improving documentation, or helping with the upcoming Windows version, everyone is warmly welcome to join us. Feel free to open issues, submit pull requests, or share your ideas. We look forward to having you as a contributor!
