@@ -207,6 +207,7 @@ private struct AxisStyle {
 struct HistoryView: View {
     let db: DB
     let live: LiveFeed
+    let feeds: FeedHub
 
     @State private var range: HistoryRange = {
         let m = Store.lastHistoryRangeMinutes
@@ -214,10 +215,10 @@ struct HistoryView: View {
     }()
     @State private var snapshot: HistorySnapshot = HistorySnapshot()
     @State private var loading: Bool = false
-    @State private var loadGen: Int = 0
     @State private var procMetric: ProcMetric = .cpu
-
-    private let autoRefreshTimer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
+    /// The currently-subscribed board feed — held so the toolbar's manual
+    /// refresh can poke it; lifecycle belongs to `.task(id: range)` below.
+    @State private var board: Feed<HistorySnapshot>?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -248,12 +249,40 @@ struct HistoryView: View {
                 .scrollIndicators(.hidden)
             }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear { reload() }
-        .onChange(of: range) { _, new in
-            Store.lastHistoryRangeMinutes = new.minutes
-            reload()
+        // The whole load/refresh lifecycle is one task-scoped feed
+        // subscription (issue #53): the 2 s pump only ticks while this view
+        // is on screen — disappearing cancels the task, which detaches the
+        // pump. No view-owned timer, so the old leaked `autoRefreshTimer`
+        // class is unrepresentable. Switching ranges restarts the task
+        // (`id: range`) onto that range's shared feed; the previous
+        // snapshot stays rendered until the new window's first value lands.
+        .task(id: range) {
+            Store.lastHistoryRangeMinutes = range.minutes
+            let feed = boardFeed(for: range)
+            board = feed
+            loading = snapshot.rowCount == 0
+            for await snap in feed.subscribeValues() {
+                snapshot = snap
+                loading = false
+            }
         }
-        .onReceive(autoRefreshTimer) { _ in if !loading { reload(silent: true) } }
+    }
+
+    /// The shared, demand-counted query for one range's history board.
+    private func boardFeed(for range: HistoryRange) -> Feed<HistorySnapshot> {
+        let db = self.db, live = self.live, minutes = range.minutes
+        return feeds.feed("history.board.\(minutes)", cadence: 2) {
+            // Grab the dense net/disk ring on the main actor (the loader
+            // runs off it), trimmed to the window and downsampled so a 1 h
+            // range isn't 3600 points.
+            let ring = await MainActor.run { () -> [LiveFeed.Sample] in
+                let since = Date().addingTimeInterval(-Double(minutes * 60))
+                return Self.downsample(live.samples.filter { $0.time >= since }, max: 900)
+            }
+            return await Task.detached(priority: .userInitiated) {
+                HistoryLoader.load(db: db, rangeMinutes: minutes, ioSamples: ring)
+            }.value
+        }
     }
 
     private var toolbar: some View {
@@ -266,7 +295,7 @@ struct HistoryView: View {
             if let s = snapshot.staleSeconds {
                 Text(String(format: NSLocalizedString("· latest %ds ago", comment: ""), s)).font(Brand.mono(10)).foregroundStyle(Brand.textTertiary)
             }
-            Button { reload() } label: {
+            Button { board?.refresh() } label: {
                 Image(systemName: "arrow.clockwise").font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Brand.textSecondary)
             }.buttonStyle(.plain).keyboardShortcut("r", modifiers: .command)
@@ -423,25 +452,6 @@ struct HistoryView: View {
     }
 
     // MARK: - Load lifecycle
-
-    private func reload(silent: Bool = false) {
-        if !silent { loading = true }
-        loadGen += 1
-        let myGen = loadGen
-        let r = self.range
-        // Grab the dense net/disk ring on the main actor (the loader runs off it),
-        // trimmed to the window and downsampled so a 1 h range isn't 3600 points.
-        let since = Date().addingTimeInterval(-Double(r.minutes * 60))
-        let ring = Self.downsample(live.samples.filter { $0.time >= since }, max: 900)
-        DispatchQueue.global(qos: .userInitiated).async {
-            let snap = HistoryLoader.load(db: self.db, rangeMinutes: r.minutes, ioSamples: ring)
-            DispatchQueue.main.async {
-                if myGen != self.loadGen { return }
-                self.snapshot = snap
-                self.loading = false
-            }
-        }
-    }
 
     private static func downsample(_ s: [LiveFeed.Sample], max: Int) -> [LiveFeed.Sample] {
         guard s.count > max else { return s }
