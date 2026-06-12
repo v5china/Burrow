@@ -183,6 +183,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
+    /// Settings ▸ General ▸ "Replay onboarding": clear the seen flag and
+    /// present the slides again right away — the same window path as first
+    /// run, so finishing them re-sets the flag and lands on Home.
+    @available(macOS 14, *)
+    func replayOnboarding() {
+        Store.onboardingCompleted = false
+        if let wc = onboardingWC {
+            wc.showWindow(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        showOnboardingWindow()
+    }
+
     /// First-run onboarding window: plain chrome, traffic lights only.
     /// Finishing marks onboarding complete and opens the main window.
     @available(macOS 14, *)

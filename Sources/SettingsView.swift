@@ -214,6 +214,14 @@ struct SettingsView: View {
                 footnote("On: Burrow retreats to the menu bar when you close the window. Off: it stays in the Dock. With the menu-bar icon hidden, the Dock icon always stays — otherwise the app would be unreachable.")
                 toggleRow("Skip Intro Screens", isOn: $skipIntro) { Store.skipIntro = $0 }
                 footnote("Jumps past the tools' idle screens where a read-only preview can start right away (Clean starts its scan when you open the tab).")
+                HStack {
+                    Text(NSLocalizedString("Onboarding", comment: "")).font(Brand.sans(12)).foregroundStyle(Brand.textPrimary)
+                    Spacer()
+                    PillButton(title: "Replay onboarding", filled: false) {
+                        if #available(macOS 14, *) { AppDelegate.shared?.replayOnboarding() }
+                    }
+                }
+                footnote("Shows the first-run slides again (permissions, what's included). Finishing them marks onboarding done as usual.")
             }
 
             section("About", "info.circle") {
