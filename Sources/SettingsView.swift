@@ -47,6 +47,8 @@ struct SettingsView: View {
     @State private var launchAtLogin: Bool = SMAppService.mainApp.status == .enabled
     @State private var hideDockIcon: Bool = Store.hideDockIcon
     @State private var skipIntro: Bool = Store.skipIntro
+    @State private var notifyOnCompletion: Bool = Store.notifyOnCompletion
+    @State private var smartReminders: Bool = Store.smartRemindersEnabled
 
     // Maintenance
     @State private var whitelistPatterns: [String] = []
@@ -222,6 +224,15 @@ struct SettingsView: View {
                     }
                 }
                 footnote("Shows the first-run slides again (permissions, what's included). Finishing them marks onboarding done as usual.")
+            }
+
+            section("Notifications", "bell.badge") {
+                toggleRow("Notify when long operations finish", isOn: $notifyOnCompletion) {
+                    Store.notifyOnCompletion = $0
+                }
+                footnote("Clean, Optimize and Uninstall post a notice with the result (e.g. space freed) when they finish while Burrow is in the background. macOS asks for notification permission the first time one fires.")
+                toggleRow("Smart reminders", isOn: $smartReminders) { Store.smartRemindersEnabled = $0 }
+                footnote("Occasional, throttled nudges: it's been a couple of weeks since your last clean, free disk space dropped under 10%, or the Trash is holding more than 5 GB. Each fires at most once a week, never while you're in the app. Off by default.")
             }
 
             section("About", "info.circle") {

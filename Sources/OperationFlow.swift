@@ -63,6 +63,14 @@ struct ToolOperation<Report: Sendable> {
     /// Optional line → HUD detail mapping (clean/optimize use
     /// TaskReportText.line); nil shows the raw line.
     var hudLine: (@Sendable (String) -> String)? = nil
+    /// Post a user notification when this run finishes — real cleans /
+    /// optimize / uninstalls, never previews. The post itself lives in
+    /// OperationCenter.end → BurrowNotifier.
+    var notifyOnEnd: Bool = false
+    /// Final OperationCenter detail derived from the finished report —
+    /// the result line a completion notification carries (freed bytes
+    /// etc.). nil keeps the last streamed line.
+    var finalDetail: (@Sendable (Report) -> String)? = nil
 
     /// "Scan with admin": the same operation, elevated — root bypasses TCC
     /// so the gate no longer applies.
@@ -157,7 +165,7 @@ final class OperationFlow<Report: Sendable>: ObservableObject {
         currentElevated = op.elevated
         currentLabel = op.label
         cancelRequested = false
-        if let label = op.label { center.begin(opID, label: label) }
+        if let label = op.label { center.begin(opID, label: label, notifiesOnEnd: op.notifyOnEnd) }
 
         let stream = process.events(spec)
         let id = opID
@@ -182,7 +190,13 @@ final class OperationFlow<Report: Sendable>: ObservableObject {
                         if op.label != nil { self.center.end(id, success: false) }
                     } else {
                         self.state = .finished(.done(exit: code))
-                        if op.label != nil { self.center.end(id, success: code == 0) }
+                        if op.label != nil {
+                            // Replace the last streamed line with the parsed
+                            // result line where the op provides one — that's
+                            // what a completion notification shows.
+                            let detail = self.report.map { op.finalDetail?($0) ?? "" } ?? ""
+                            self.center.end(id, success: code == 0, detail: detail)
+                        }
                     }
                 }
             }
@@ -211,12 +225,17 @@ typealias TaskRunReport = (groups: [TaskGroup], summary: TaskSummary?)
 
 extension ToolOperation where Report == TaskRunReport {
     /// A streaming `mo` run rendered through TaskReportView — the shape
-    /// clean and optimize share.
+    /// clean and optimize share. `notifyOnEnd` rides through to the
+    /// completion notification, with the parsed summary (freed bytes)
+    /// as the final detail line.
     static func moleStream(_ args: [String], gate: Gate = .none,
-                           elevated: Bool = false, label: String?) -> ToolOperation {
+                           elevated: Bool = false, label: String?,
+                           notifyOnEnd: Bool = false) -> ToolOperation {
         ToolOperation(label: label, arguments: args, gate: gate, elevated: elevated,
                       reduce: { parseTaskReport($0) },
-                      hudLine: { TaskReportText.line($0) })
+                      hudLine: { TaskReportText.line($0) },
+                      notifyOnEnd: notifyOnEnd,
+                      finalDetail: { $0.summary?.completionLine ?? "" })
     }
 }
 

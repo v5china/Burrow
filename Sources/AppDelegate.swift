@@ -21,6 +21,7 @@
 
 import Cocoa
 import SwiftUI
+import UserNotifications
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// Singleton handle so SwiftUI views can reach the live
@@ -125,6 +126,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let maintenance = Maintenance(db: db)
         self.maintenance = maintenance
         maintenance.start()
+
+        // Completion notices + opt-in smart reminders. The delegate must
+        // be set before any notification is delivered or clicked;
+        // authorization is requested lazily by the first actual post
+        // (BurrowNotifier), never here at launch. (Main-actor hop: the
+        // notifier is @MainActor, this delegate callback isn't.)
+        Task { @MainActor in
+            UNUserNotificationCenter.current().delegate = BurrowNotifier.shared
+            BurrowNotifier.shared.startReminders()
+        }
 
         if Store.showMenuBarIcon {
             self.statusBar = StatusBarController(db: db, producer: producer, delegate: self)
@@ -302,6 +313,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         self.installMainContent(into: window, initial: initial)
         wc.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// Bring Burrow forward without forcing a pane switch — notification
+    /// clicks land here so a completion notice doesn't navigate away from
+    /// the finished run's receipt. Reopens the main window only when
+    /// nothing is visible.
+    @available(macOS 14.0, *)
+    func bringForward() {
+        if mainWC?.window?.isVisible == true {
+            NSApp.setActivationPolicy(.regular)
+            mainWC?.window?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        } else {
+            openMainWindow(initial: .home)
+        }
     }
 
     @available(macOS 14.0, *)
