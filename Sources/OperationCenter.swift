@@ -44,6 +44,10 @@ final class OperationCenter: ObservableObject {
                           notifiesOnEnd: notifiesOnEnd), at: 0)
         }
         if ops.count > 6 { ops = Array(ops.prefix(6)) }
+        // Settle notification permission now, while the op runs, so the
+        // completion notice can fire the moment it ends (even if the window
+        // has been closed by then).
+        if notifiesOnEnd { BurrowNotifier.shared.prepareAuthorization() }
     }
 
     func detail(_ id: UUID, _ text: String) {

@@ -297,10 +297,12 @@ struct HistoryView: View {
 
     /// Evenly spaced sample indices to label on a by-index bar axis — maps
     /// back to real timestamps for the labels without distorting the bars.
-    private func barAxisTicks(_ count: Int, desired: Int) -> [Int] {
+    /// Doubles so they match the bars' Double x-scale (an Int x on a Double
+    /// domain renders nothing).
+    private func barAxisTicks(_ count: Int, desired: Int) -> [Double] {
         guard count > 1 else { return count == 1 ? [0] : [] }
         let n = max(2, min(desired, count))
-        return (0..<n).map { Int((Double($0) * Double(count - 1) / Double(n - 1)).rounded()) }
+        return (0..<n).map { (Double($0) * Double(count - 1) / Double(n - 1)).rounded() }
     }
 
     private func chartCard(_ title: String, _ subtitle: String,
@@ -334,7 +336,7 @@ struct HistoryView: View {
                     Chart {
                         ForEach(series, id: \.name) { s in
                             ForEach(Array(s.points.enumerated()), id: \.offset) { idx, p in
-                                BarMark(x: .value("Sample", idx), y: .value("Value", p.value),
+                                BarMark(x: .value("Sample", Double(idx)), y: .value("Value", p.value),
                                         width: .ratio(0.7))
                                     .foregroundStyle(s.color.opacity(0.85))
                             }
@@ -344,9 +346,12 @@ struct HistoryView: View {
                     .chartXAxis {
                         AxisMarks(values: barAxisTicks(pts.count, desired: style.desiredCount)) { v in
                             AxisGridLine().foregroundStyle(Brand.hairline)
-                            if let i = v.as(Int.self), i >= 0, i < pts.count {
-                                AxisValueLabel { Text(pts[i].time, format: style.format) }
-                                    .foregroundStyle(Brand.textTertiary).font(Brand.mono(8))
+                            if let d = v.as(Double.self) {
+                                let i = Int(d.rounded())
+                                if i >= 0, i < pts.count {
+                                    AxisValueLabel { Text(pts[i].time, format: style.format) }
+                                        .foregroundStyle(Brand.textTertiary).font(Brand.mono(8))
+                                }
                             }
                         }
                     }

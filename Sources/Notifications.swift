@@ -255,21 +255,48 @@ final class BurrowNotifier: NSObject {
         post(content, id: id)
     }
 
-    /// Deliver, requesting authorization lazily on the very first post.
-    /// Denied = stay silent forever; the OS owns that choice.
+    /// Ask for notification permission up front — called when a notifying
+    /// operation STARTS, so the grant is settled before the run finishes
+    /// (requesting only at completion races a closed window). Logged so a
+    /// denial, or an unsigned-build registration failure, is visible in
+    /// Console (`log stream --predicate 'eventMessage CONTAINS "Burrow.notify"'`).
+    func prepareAuthorization() {
+        guard !inert else { return }
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            switch settings.authorizationStatus {
+            case .notDetermined:
+                center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+                    if let error {
+                        NSLog("Burrow.notify: authorization request failed: \(error.localizedDescription)")
+                    } else {
+                        NSLog("Burrow.notify: notification permission \(granted ? "granted" : "declined")")
+                    }
+                }
+            case .denied:
+                NSLog("Burrow.notify: notifications are OFF in System Settings ▸ Notifications ▸ Burrow")
+            default:
+                break
+            }
+        }
+    }
+
+    /// Deliver. Authorization is normally already settled by
+    /// `prepareAuthorization()`; this still requests lazily as a fallback.
     private nonisolated func post(_ content: UNMutableNotificationContent, id: String) {
         let center = UNUserNotificationCenter.current()
         center.getNotificationSettings { settings in
             let request = UNNotificationRequest(identifier: id, content: content, trigger: nil)
             switch settings.authorizationStatus {
             case .notDetermined:
-                center.requestAuthorization(options: [.alert]) { granted, _ in
+                center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+                    if let error { NSLog("Burrow.notify: auth failed: \(error.localizedDescription)") }
                     if granted { center.add(request) }
                 }
             case .denied:
-                break
+                NSLog("Burrow.notify: suppressed — notifications denied for Burrow")
             default:
-                center.add(request)
+                center.add(request) { if let e = $0 { NSLog("Burrow.notify: add failed: \(e.localizedDescription)") } }
             }
         }
     }
