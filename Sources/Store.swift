@@ -16,6 +16,16 @@
 
 import Foundation
 
+/// How the real clean removes caches (see `Store.cacheRemovalMode`).
+enum CacheRemovalMode: String {
+    case permanent, trash
+}
+
+/// What the menu-bar status item renders (see `Store.menuBarDisplayMode`).
+enum MenuBarDisplayMode: String {
+    case icon, metrics
+}
+
 enum Store {
     /// Backing defaults. A `var` so the test suite can swap in a scratch
     /// suite: the test bundle is hosted inside the real app (TEST_HOST), so
@@ -274,6 +284,125 @@ enum Store {
     static var telemetryEnabled: Bool {
         get { d.object(forKey: "telemetry_enabled") as? Bool ?? true }
         set { write(newValue, "telemetry_enabled") }
+    }
+
+    // MARK: - Behavior toggles (Settings ▸ General / Maintenance / Menu Bar)
+
+    /// Skip the tools' idle hero screens and onboarding re-entry — open
+    /// straight to the working views. Off by default; the heroes are the
+    /// product's voice, power users can mute them.
+    static var skipIntro: Bool {
+        get { d.object(forKey: "skip_intro") as? Bool ?? false }
+        set { write(newValue, "skip_intro") }
+    }
+
+    /// How the real clean removes caches. `.permanent` is the engine's
+    /// behavior and the default (freed bytes are real, immediately).
+    /// `.trash` routes the reviewed, ticked paths through the Finder
+    /// Trash instead — recoverable, but space frees only when Trash
+    /// empties and the run won't appear in `mo history`.
+    static var cacheRemovalMode: CacheRemovalMode {
+        get { CacheRemovalMode(rawValue: d.string(forKey: "cache_removal_mode") ?? "") ?? .permanent }
+        set { write(newValue.rawValue, "cache_removal_mode") }
+    }
+
+    /// What the status item shows: the Burrow mark, or live text metrics.
+    static var menuBarDisplayMode: MenuBarDisplayMode {
+        get { MenuBarDisplayMode(rawValue: d.string(forKey: "menu_bar_display_mode") ?? "") ?? .icon }
+        set { write(newValue.rawValue, "menu_bar_display_mode") }
+    }
+
+    /// Whether closing the last window drops the Dock icon (the classic
+    /// menu-bar-agent behavior, on by default). Off keeps Burrow in the
+    /// Dock permanently. The safety inversion stays: with the menu-bar
+    /// icon hidden, the Dock icon can't also be hidden.
+    static var hideDockIcon: Bool {
+        get { d.object(forKey: "hide_dock_icon") as? Bool ?? true }
+        set { write(newValue, "hide_dock_icon") }
+    }
+
+    /// Whether Clean Screen also swallows key presses while wiping
+    /// (except Esc). Opt-in: it needs the Accessibility permission for a
+    /// CGEventTap; without it Clean Screen still works, keys just pass.
+    static var cleanScreenInputLock: Bool {
+        get { d.object(forKey: "clean_screen_input_lock") as? Bool ?? false }
+        set { write(newValue, "clean_screen_input_lock") }
+    }
+
+    /// Global open/toggle-Burrow shortcut. nil = none recorded.
+    static var globalShortcut: HotKey? {
+        get { shortcut(for: .openBurrow) }
+        set { setShortcut(newValue, for: .openBurrow) }
+    }
+
+    /// Recorded shortcut for one of the menu-bar tool actions.
+    static func shortcut(for action: HotKeyAction) -> HotKey? {
+        d.string(forKey: action.storeKey).flatMap(HotKey.init(storageValue:))
+    }
+
+    static func setShortcut(_ hotKey: HotKey?, for action: HotKeyAction) {
+        if let hk = hotKey { write(hk.storageValue, action.storeKey) }
+        else { d.removeObject(forKey: action.storeKey); d.synchronize() }
+    }
+
+    // MARK: - Notifications
+
+    /// Completion notices for long operations (real clean / optimize /
+    /// uninstall), posted only when Burrow isn't frontmost. ON by
+    /// default — "tell me when the thing I started finishes" is the
+    /// quiet, useful default.
+    static var notifyOnCompletion: Bool {
+        get { d.object(forKey: "notify_on_completion") as? Bool ?? true }
+        set { write(newValue, "notify_on_completion") }
+    }
+
+    /// Smart reminders (clean cadence / low disk / full Trash). Opt-in:
+    /// nudges are a taste thing and the default must stay quiet.
+    static var smartRemindersEnabled: Bool {
+        get { d.object(forKey: "smart_reminders_enabled") as? Bool ?? false }
+        set { write(newValue, "smart_reminders_enabled") }
+    }
+
+    // Reminder throttle state (not user-facing): hysteresis flags so a
+    // metric hovering at its threshold can't flap, timestamps for the
+    // weekly cooldowns. See ReminderRules (Notifications.swift).
+
+    static var diskLowNoticeActive: Bool {
+        get { d.object(forKey: "disk_low_notice_active") as? Bool ?? false }
+        set { write(newValue, "disk_low_notice_active") }
+    }
+
+    static var trashNoticeActive: Bool {
+        get { d.object(forKey: "trash_notice_active") as? Bool ?? false }
+        set { write(newValue, "trash_notice_active") }
+    }
+
+    static var lastCleanReminderAt: Date? {
+        get { d.object(forKey: "last_clean_reminder_at") as? Date }
+        set { write(newValue, "last_clean_reminder_at") }
+    }
+
+    static var lastTrashReminderAt: Date? {
+        get { d.object(forKey: "last_trash_reminder_at") as? Date }
+        set { write(newValue, "last_trash_reminder_at") }
+    }
+
+    // MARK: - Onboarding
+
+    /// Whether the user has finished (or skipped past) the first-run
+    /// onboarding slides. False on a fresh install so they show exactly
+    /// once, after the mo-missing gate; sticky forever after.
+    static var onboardingCompleted: Bool {
+        get { d.object(forKey: "onboarding_completed") as? Bool ?? false }
+        set { write(newValue, "onboarding_completed") }
+    }
+
+    /// Whether the user has seen the first-run telemetry disclosure (the
+    /// onboarding card that names the toggle inline). False on a fresh
+    /// install so onboarding surfaces it once; sticky after.
+    static var telemetryNoticeAcknowledged: Bool {
+        get { d.object(forKey: "telemetry_notice_acknowledged") as? Bool ?? false }
+        set { write(newValue, "telemetry_notice_acknowledged") }
     }
 
     // MARK: - History view
