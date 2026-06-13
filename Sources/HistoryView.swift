@@ -295,14 +295,12 @@ struct HistoryView: View {
     /// discrete usage-style metrics (CPU / GPU / health) read as bars.
     private enum ChartMarks { case line, bars }
 
-    /// Fixed bar width for a bars card, scaled to the point count: fat when
-    /// a short range holds a handful of samples, thin when a long range
-    /// packs hundreds. (Computed against the card's typical plot width;
-    /// the clamp keeps it sane if the real width differs.)
-    private func barWidth(for count: Int) -> CGFloat {
-        let typicalPlotWidth = 360.0
-        let slot = typicalPlotWidth / Double(max(count, 1))
-        return CGFloat(max(2.0, min(14.0, slot * 0.66)))
+    /// Evenly spaced sample indices to label on a by-index bar axis — maps
+    /// back to real timestamps for the labels without distorting the bars.
+    private func barAxisTicks(_ count: Int, desired: Int) -> [Int] {
+        guard count > 1 else { return count == 1 ? [0] : [] }
+        let n = max(2, min(desired, count))
+        return (0..<n).map { Int((Double($0) * Double(count - 1) / Double(n - 1)).rounded()) }
     }
 
     private func chartCard(_ title: String, _ subtitle: String,
@@ -323,33 +321,50 @@ struct HistoryView: View {
                     Text("No samples in this window")
                         .font(Brand.mono(11)).foregroundStyle(Brand.textTertiary)
                         .frame(maxWidth: .infinity, minHeight: 170)
+                } else if marks == .bars {
+                    // Bars are plotted BY INDEX (like the Status sparklines):
+                    // each sample gets an equal slot, so width and gaps are
+                    // uniform at every range. On a continuous time axis the
+                    // bars bunched up where samples clustered and stretched
+                    // where they were sparse — index spacing fixes both. An
+                    // integer x has a unit step of 1, so .ratio sizes the bar
+                    // as a clean fraction of that slot. Axis labels map a few
+                    // indices back to their real timestamps.
+                    let pts = series.first?.points ?? []
+                    Chart {
+                        ForEach(series, id: \.name) { s in
+                            ForEach(Array(s.points.enumerated()), id: \.offset) { idx, p in
+                                BarMark(x: .value("Sample", idx), y: .value("Value", p.value),
+                                        width: .ratio(0.7))
+                                    .foregroundStyle(s.color.opacity(0.85))
+                            }
+                        }
+                    }
+                    .chartXScale(domain: -0.5 ... (Double(max(pts.count, 1)) - 0.5))
+                    .chartXAxis {
+                        AxisMarks(values: barAxisTicks(pts.count, desired: style.desiredCount)) { v in
+                            AxisGridLine().foregroundStyle(Brand.hairline)
+                            if let i = v.as(Int.self), i >= 0, i < pts.count {
+                                AxisValueLabel { Text(pts[i].time, format: style.format) }
+                                    .foregroundStyle(Brand.textTertiary).font(Brand.mono(8))
+                            }
+                        }
+                    }
+                    .chartYAxis {
+                        AxisMarks { _ in
+                            AxisGridLine().foregroundStyle(Brand.hairline)
+                            AxisValueLabel().foregroundStyle(Brand.textTertiary).font(Brand.mono(8))
+                        }
+                    }
+                    .frame(height: 170)
                 } else {
                     Chart {
                         ForEach(series, id: \.name) { s in
-                            if marks == .bars {
-                                // Bars keep the gap behaviour for free:
-                                // where Burrow wasn't sampling there is no
-                                // point, hence no bar — never a fill drawn
-                                // across a hole in the data.
-                                ForEach(s.points) { p in
-                                    // BarMark sits on a CONTINUOUS time axis
-                                    // (chartXScale domain) with no implicit
-                                    // category step, so .ratio collapses to
-                                    // nothing and the default fills the gap to
-                                    // the next bar ("too wide"). A fixed width
-                                    // scaled to the point count stays bar-shaped
-                                    // and thin across every range.
-                                    BarMark(x: .value("Time", p.time), y: .value("Value", p.value),
-                                            width: .fixed(barWidth(for: s.points.count)))
-                                        .foregroundStyle(s.color.opacity(0.85))
-                                }
-                            } else {
-                                ForEach(HistorySegment.split(s.points, name: s.name, gap: gapThreshold)) { p in
-                                    LineMark(x: .value("Time", p.time), y: .value("Value", p.value),
-                                             series: .value("Series", p.key))
-                                        .foregroundStyle(s.color)
-                                        .interpolationMethod(.monotone)
-                                }
+                            ForEach(HistorySegment.split(s.points, name: s.name, gap: gapThreshold)) { p in
+                                LineMark(x: .value("Time", p.time), y: .value("Value", p.value),
+                                         series: .value("Series", p.key))
+                                    .foregroundStyle(s.color)
+                                    .interpolationMethod(.monotone)
                             }
                         }
                     }
