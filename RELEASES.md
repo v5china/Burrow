@@ -1,42 +1,62 @@
 # Burrow 0.7.0
 
-A polish-and-fixes release on top of the 2026-06 redesign: clearer history
-charts, accurate GPU readings, notifications when long jobs finish, and a
-friendlier first run.
+The big one: a top-to-bottom redesign of every tool — onboarding, a real Clean
+review pipeline, a new Software tab, and rebuilt Status, popover, Analyze, and
+Settings — plus a wave of polish on top.
+
+## A redesigned app
+- **First-run onboarding.** A short, skippable intro: grant Full Disk Access
+  (with a one-click relaunch), confirm the `mo` engine is installed and see its
+  version, and a "free & open source" card. No more cold start.
+- **Clean, reviewable before it runs.** Scan now streams a live count-up — the
+  animation *is* the scan — into a per-item **review screen**: tri-state category
+  cards, honest "what this frees" lines, open-app badges, and a "Permanently
+  clean · N GB" pill. Deselected items ride a fenced whitelist session for
+  exactly one run and are restored byte-for-byte after. New **Move-to-Trash
+  mode** recycles only the reviewed items (recoverable) instead of permanent
+  deletion.
+- **New Software tab.** **Uninstall** with an expandable per-app leftover review
+  (auto-selects app/support/prefs/containers; flags caches/logs for review) and
+  two-path removal. **Updates** — one list with Sparkle / App Store / Electron /
+  Homebrew badges (network only on click). **Startup** — a read-only Launch
+  Agents/Daemons inventory with problem rows.
+- **Rebuilt Status dashboard.** Corner chips, battery ring gauges (Bluetooth
+  folded in), a low-space gradient bar, a read-only fan tile, a power column
+  (honest "—" where the kernel won't say), and an independently scrolling process
+  table with a per-row Quit/Force-Kill menu.
+- **Rebuilt menu-bar popover.** A one-line health header + hardware chips, six
+  metric tiles, a battery card with "⚡ Top drain", a Stay-Awake / Wipe / Eject
+  strip, and a Clean Watch footer.
+- **Analyze: real scan progress.** A true per-child counter ("● ~/Downloads ·
+  3/12") — Burrow drives the loop, so the number is real, never invented.
+- **Settings, reorganized.** Tabbed panel — General / Maintenance / Menu Bar /
+  Advanced — with a whitelist manager (Protected Items), Permanent|Trash removal
+  mode, status-item Icon|Metrics mode, and global shortcut recorders.
+- **Menu-bar tools.** Keep Screen On (with durations), Clean Screen (Esc always
+  exits), an About panel, and manual Check for Updates.
 
 ## Charts & metrics
-- **History charts as bars.** CPU usage, GPU usage, and health score now render
-  as clean, evenly-spaced bars across every time range — easier to read at a
-  glance than a line.
-- **Real GPU usage.** On Apple Silicon, GPU utilization is read natively and
-  persisted, so the tiles and history show the true figure instead of a flat
-  zero.
-- **Tighter live tiles.** The network sparkline windows to the last couple of
-  minutes so current bursts actually show, the GPU tile reads as bars like CPU,
-  and the fan tile gains an RPM-over-time sparkline.
-- **Compact, scrollable process table** on Status — more processes, less wasted
-  height.
+- **History charts as bars** — CPU usage, GPU usage, and health score render as
+  clean, evenly-spaced bars at every range.
+- **Real GPU usage** on Apple Silicon, read natively and persisted (no more flat
+  zero).
+- **Tighter live tiles** — network sparkline windowed to the last couple of
+  minutes, GPU as bars like CPU, and a new fan RPM-over-time sparkline.
 
 ## Notifications
-- **Finish-line notices.** Get notified when a real clean, optimize, or
-  uninstall finishes — with what it freed.
-- **Opt-in smart reminders.** Optional nudges when disk space runs low, the
-  Trash is holding gigabytes, or it's been a while since your last clean. Off by
-  default and throttled so they never get chatty; toggle both in Settings.
+- **Finish-line notices** when a real clean, optimize, or uninstall completes —
+  with what it freed.
+- **Opt-in smart reminders** — low disk, full Trash, or "it's been a while since
+  your last clean." Off by default and throttled so they never get chatty.
 
-## Onboarding & Settings
-- **Engine check on first run.** Onboarding confirms the `mo` engine is
-  installed and shows its version before you start.
-- **Settings, redrawn.** A first-class Settings pane — no boxed-dialog chrome —
-  with truthful Touch ID copy (it covers terminal `sudo`, not Burrow's own
-  administrator prompts).
-- **One-click relaunch for Full Disk Access.** Grant FDA and Burrow offers to
-  relaunch right there, since macOS only applies it to a fresh launch.
-
-## Fixes & hardening
-- Clean review protects deselected items more safely: whitelist session paths
-  are glob-escaped (a path with brackets or spaces still matches itself), an
-  unreadable whitelist aborts instead of being overwritten, and the fenced
-  session is always restored when a run ends — even if you navigate away.
-- Popover height tracks its content; the Wipe action shows an armed state.
-- Deduped the doubled "macOS" in the version label.
+## Polish & hardening
+- One-click **Relaunch** when Full Disk Access is granted mid-session.
+- Truthful Touch ID copy (it covers terminal `sudo`, not Burrow's own admin
+  prompts).
+- Clean-review safety: whitelist session paths glob-escaped, unreadable
+  whitelist aborts instead of overwriting, session always restored when a run
+  ends.
+- Popover height tracks content; Wipe shows an armed state; deduped the doubled
+  "macOS" version label.
+- ~230 new strings localized in 简体中文 and 繁體中文; accessibility labels and
+  Reduce Motion on every new surface.

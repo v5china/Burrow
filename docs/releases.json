@@ -5,46 +5,46 @@
       "version": "0.7.0",
       "date": "2026-06-13",
       "tag": "v0.7.0",
-      "tagline": "Polish and fixes on the redesign — cleaner charts, real GPU, and notifications when work finishes.",
+      "tagline": "The big one — every tool redesigned, a real Clean review pipeline, a new Software tab, and notifications when work finishes.",
       "highlights": [
         {
-          "icon": "chart",
+          "icon": "layout",
           "color": "gold",
-          "title": "Charts as bars",
-          "line": "History CPU, GPU and health-score render as clean, evenly-spaced bars at every range."
+          "title": "Every tool redesigned",
+          "line": "Onboarding, Clean, Software, Status, the menu-bar popover, Analyze and Settings — all rebuilt."
         },
         {
-          "icon": "gauge",
+          "icon": "sweep",
+          "color": "lilac",
+          "title": "Review before you clean",
+          "line": "Scan streams a live count-up into a per-item review screen; deselected paths are protected for exactly one run."
+        },
+        {
+          "icon": "package",
           "color": "azure",
-          "title": "Real GPU usage",
-          "line": "GPU is read natively on Apple Silicon and persisted, so tiles and history show the true figure."
+          "title": "New Software tab",
+          "line": "Per-app uninstall review, a unified Updates list with source badges, and a startup inventory."
+        },
+        {
+          "icon": "chart",
+          "color": "coral",
+          "title": "Bars + real GPU",
+          "line": "History CPU, GPU and health render as bars, and GPU usage is read natively on Apple Silicon."
         },
         {
           "icon": "pulse",
           "color": "green",
           "title": "Finish-line alerts",
           "line": "Get notified when a clean, optimize or uninstall finishes, plus opt-in low-disk and Trash reminders."
-        },
-        {
-          "icon": "layout",
-          "color": "lilac",
-          "title": "Settings, redrawn",
-          "line": "A first-class Settings pane, with one-click relaunch the moment Full Disk Access is granted."
-        },
-        {
-          "icon": "package",
-          "color": "coral",
-          "title": "Engine on first run",
-          "line": "Onboarding confirms the mo engine is installed and shows its version before you start."
         }
       ],
       "chips": [
+        "One-click relaunch when Full Disk Access is granted",
+        "First-run onboarding checks the mo engine + version",
         "Compact, scrollable process table",
-        "Network tile windowed to recent minutes",
-        "Fan RPM sparkline",
-        "Glob-escaped whitelist sessions (clean-review safety)",
-        "Truthful Touch ID copy",
-        "Deduped macOS version label"
+        "Keep Screen On · Clean Screen · global shortcuts",
+        "~230 strings localized in 简体中文 / 繁體中文",
+        "Truthful Touch ID copy"
       ]
     },
     {
