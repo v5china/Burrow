@@ -43,6 +43,10 @@ struct SettingsView: View {
 
     // General
     @State private var fdaGranted = Privacy.hasFullDiskAccess()
+    /// FDA state when Settings opened. The running process only gains FDA
+    /// on relaunch, so a false→true flip (the user granted it just now)
+    /// means a relaunch is needed before scans can reach protected caches.
+    private let fdaAtOpen = Privacy.hasFullDiskAccess()
     @State private var appLanguage: String = Store.appLanguage
     @State private var launchAtLogin: Bool = SMAppService.mainApp.status == .enabled
     @State private var hideDockIcon: Bool = Store.hideDockIcon
@@ -177,7 +181,11 @@ struct SettingsView: View {
                         : NSLocalizedString("Off. Safe scan in use — most system caches stay out of reach.", comment: ""),
                     granted: fdaGranted,
                     onOpenSettings: { Privacy.openFullDiskAccessSettings() },
-                    onCheck: { fdaGranted = Privacy.hasFullDiskAccess() })
+                    onCheck: { fdaGranted = Privacy.hasFullDiskAccess() },
+                    // Granted this session → macOS only hands FDA to a fresh
+                    // process, so offer a one-click relaunch instead of the
+                    // system's "quit it yourself" prompt.
+                    onRelaunch: (fdaGranted && !fdaAtOpen) ? { Privacy.relaunch() } : nil)
             }
 
             section("Language", "globe") {
