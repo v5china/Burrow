@@ -316,7 +316,7 @@
 
   <!-- ===== HERO ===== -->
   <header class="hero">
-    <span class="brandline">Open source · <b>github.com/caezium/Burrow</b> · v0.7.1</span>
+    <span class="brandline">Open source · <b>github.com/caezium/Burrow</b> · v0.7.2</span>
     <h1>Burrow
       <svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><path d="M14 74 a36 36 0 0 1 72 0 Z" fill="#F3ECDD"/><rect x="38" y="74" width="24" height="7" rx="3.5" fill="#121217"/></svg>
     </h1>
@@ -384,35 +384,41 @@
     <div class="sec-head wn-head">
       <div>
         <span class="sec-num">What's new · June 2026</span>
-        <h2 class="sec-title">New in 0.7.1</h2>
+        <h2 class="sec-title">New in 0.7.2</h2>
       </div>
       <a class="btn btn-out btn-sm" href="releases.html">All releases</a>
     </div>
 
     <div class="grid3 wn-grid">
-      <article class="tcard" style="--c: var(--gold)">
-        <div class="top"><div class="ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19a9 9 0 1114 0"/><path d="M12 13l4-4"/><circle cx="12" cy="13" r="1.6"/></svg></div><div class="nm">Freezes, fixed</div></div>
-        <p class="ds">The History view, slow startup, and typing in Uninstall &amp; Purge no longer lock the app — every app-hang from launch is gone.</p>
+      <article class="tcard" style="--c: var(--teal)">
+        <div class="top"><div class="ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M9.59 4.59A2 2 0 1111 8H2m10.59 11.41A2 2 0 1014 16H2m15.73-8.27A2.5 2.5 0 1119.5 12H2"/></svg></div><div class="nm">Cleanup, unified</div></div>
+        <p class="ds">Purge and Installers fold into Clean as category cards, each with a real result screen and the raw log tucked behind a View Log toggle.</p>
       </article>
-      <article class="tcard" style="--c: var(--lilac)">
-        <div class="top"><div class="ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9.5 11.5l2 2 3.5-3.5"/></svg></div><div class="nm">A crash, fixed</div></div>
-        <p class="ds">The menu-bar popover and Status mini-charts could segfault on a transition; they now draw as one stable shape.</p>
+      <article class="tcard" style="--c: var(--coral)">
+        <div class="top"><div class="ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg></div><div class="nm">Updates that show</div></div>
+        <p class="ds">Homebrew updates appear the moment you open the Apps tab, and your own login items get on/off toggles.</p>
       </article>
       <article class="tcard" style="--c: var(--azure)">
-        <div class="top"><div class="ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-7 4 14 2.5-7h5"/></svg></div><div class="nm">Lighter live metrics</div></div>
-        <p class="ds">The HUD, Status and Activity panels share one refresh pump now, and GPU history bars draw again on Apple Silicon.</p>
+        <div class="top"><div class="ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20v-6M9 20V8M14 20v-9M19 20V5"/></svg></div><div class="nm">Up &amp; down, split</div></div>
+        <p class="ds">Network charts in Status and History now draw download and upload as two separate lines.</p>
+      </article>
+      <article class="tcard" style="--c: var(--gold)">
+        <div class="top"><div class="ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.5 4 5.6 4 9s-1.4 6.5-4 9c-2.6-2.5-4-5.6-4-9s1.4-6.5 4-9z"/></svg></div><div class="nm">Self-update</div></div>
+        <p class="ds">Burrow checks itself for new versions (opt-in, default on) and shows a banner plus a menu-bar dot — it never installs on its own.</p>
+      </article>
+      <article class="tcard" style="--c: var(--lilac)">
+        <div class="top"><div class="ico"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M3 8h18M9 21h6"/></svg></div><div class="nm">Camera &amp; mic</div></div>
+        <p class="ds">An optional in-use indicator in the menu-bar popover (off by default), reading the same signal as Control Center.</p>
       </article>
     </div>
 
-    <div class="extra-label mono">// also tightened in 0.7.1</div>
+    <div class="extra-label mono">// also tightened in 0.7.2</div>
     <div class="wn-chips">
-      <span class="wn-chip"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>History view no longer freezes on wide time ranges</span>
-      <span class="wn-chip"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>Faster launch — mo discovery moved off the main thread</span>
-      <span class="wn-chip"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>Fixed a crash opening the menu-bar popover charts</span>
-      <span class="wn-chip"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>Smooth typing during Uninstall &amp; Purge</span>
-      <span class="wn-chip"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>Process-row Quit/Force-Kill menu no longer rebuilt every refresh</span>
-      <span class="wn-chip"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>GPU history bars draw again on Apple Silicon</span>
-      <span class="wn-chip"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>One shared refresh pump for HUD / Status / Activity</span>
+      <span class="wn-chip"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>Analyze shows live per-folder progress on the first scan</span>
+      <span class="wn-chip"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>Confirm dialogs &amp; Touch ID no longer reported as app-hangs</span>
+      <span class="wn-chip"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>Live App Store / Sparkle update checks stay click-gated — no silent network</span>
+      <span class="wn-chip"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>View Log on every result screen (Clean / Optimize / Purge / Installers)</span>
+      <span class="wn-chip"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>About &amp; Check for Updates now in Settings too</span>
     </div>
     <!-- WN:END -->
   </section>

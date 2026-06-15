@@ -2,6 +2,51 @@
   "_comment": "Source of truth for the site's release history. Newest first. Edit this, then run `python3 scripts/site-release.py` to regenerate the homepage 'New in X' section and releases.html. Icons/colors: run `python3 scripts/site-release.py --list-icons`.",
   "releases": [
     {
+      "version": "0.7.2",
+      "date": "2026-06-15",
+      "tag": "v0.7.2",
+      "tagline": "A feature pass on the redesign — cleanup, software and the live dashboard get more capable, with opt-in update and privacy surfaces.",
+      "highlights": [
+        {
+          "icon": "sweep",
+          "color": "teal",
+          "title": "Cleanup, unified",
+          "line": "Purge and Installers fold into Clean as category cards, each with a real result screen and the raw log tucked behind a View Log toggle."
+        },
+        {
+          "icon": "package",
+          "color": "coral",
+          "title": "Updates that show",
+          "line": "Homebrew updates appear the moment you open the Apps tab, and your own login items get on/off toggles."
+        },
+        {
+          "icon": "chart",
+          "color": "azure",
+          "title": "Up & down, split",
+          "line": "Network charts in Status and History now draw download and upload as two separate lines."
+        },
+        {
+          "icon": "globe",
+          "color": "gold",
+          "title": "Self-update",
+          "line": "Burrow checks itself for new versions (opt-in, default on) and shows a banner plus a menu-bar dot — it never installs on its own."
+        },
+        {
+          "icon": "monitor",
+          "color": "lilac",
+          "title": "Camera & mic",
+          "line": "An optional in-use indicator in the menu-bar popover (off by default), reading the same signal as Control Center."
+        }
+      ],
+      "chips": [
+        "Analyze shows live per-folder progress on the first scan",
+        "Confirm dialogs & Touch ID no longer reported as app-hangs",
+        "Live App Store / Sparkle update checks stay click-gated — no silent network",
+        "View Log on every result screen (Clean / Optimize / Purge / Installers)",
+        "About & Check for Updates now in Settings too"
+      ]
+    },
+    {
       "version": "0.7.1",
       "date": "2026-06-14",
       "tag": "v0.7.1",
