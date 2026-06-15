@@ -302,6 +302,15 @@
 "Listening ports" = "监听端口";
 "See who's listening." = "看看谁在监听。";
 "Quit this process?" = "退出此进程？";
+"tuneup" = "调优";
+"Tune-Up" = "调优";
+"One pass, a tidier den." = "一次整理，洞穴更整洁。";
+"Safe to run" = "可安全执行";
+"Needs review" = "需要审查";
+"Run safe set" = "执行安全项";
+"Clear %@ cache" = "清理 %@ 缓存";
+"Review startup item: %@" = "审查启动项：%@";
+"Nothing to tune up — you're clean." = "没有需要调优的内容——很干净。";
 "A new startup item appeared" = "出现了新的启动项";
 "“%@” now launches automatically. If you didn't add it, review it." = "“%@” 现在会自动启动。如果不是你添加的，请检查它。";
 "CPU usage is high" = "CPU 使用率过高";

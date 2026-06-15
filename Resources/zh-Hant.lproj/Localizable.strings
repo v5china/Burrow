@@ -302,6 +302,15 @@
 "Listening ports" = "監聽連接埠";
 "See who's listening." = "看看誰在監聽。";
 "Quit this process?" = "退出此程序？";
+"tuneup" = "調校";
+"Tune-Up" = "調校";
+"One pass, a tidier den." = "一次整理，洞穴更整潔。";
+"Safe to run" = "可安全執行";
+"Needs review" = "需要審查";
+"Run safe set" = "執行安全項";
+"Clear %@ cache" = "清理 %@ 快取";
+"Review startup item: %@" = "審查啟動項：%@";
+"Nothing to tune up — you're clean." = "沒有需要調校的內容——很乾淨。";
 "A new startup item appeared" = "出現了新的啟動項";
 "“%@” now launches automatically. If you didn't add it, review it." = "“%@” 現在會自動啟動。如果不是你新增的，請檢查它。";
 "CPU usage is high" = "CPU 使用率過高";

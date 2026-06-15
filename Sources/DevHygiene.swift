@@ -42,4 +42,18 @@ enum DevHygiene {
     }
 
     static func total(_ sizes: [Int64]) -> Int64 { sizes.reduce(0, +) }
+
+    /// Recursive allocated size of a directory (0 if absent/unreadable). FS
+    /// work — call off the main thread. Shared by the hygiene + Tune-Up panes.
+    static func directorySize(_ path: String) -> Int64 {
+        let url = URL(fileURLWithPath: path)
+        let keys: Set<URLResourceKey> = [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey]
+        guard let en = FileManager.default.enumerator(at: url, includingPropertiesForKeys: Array(keys)) else { return 0 }
+        var total: Int64 = 0
+        for case let file as URL in en {
+            let v = try? file.resourceValues(forKeys: keys)
+            total += Int64(v?.totalFileAllocatedSize ?? v?.fileAllocatedSize ?? 0)
+        }
+        return total
+    }
 }

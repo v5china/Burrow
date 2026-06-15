@@ -83,7 +83,7 @@ struct DevHygieneView: View {
             var out: [Row] = []
             for eco in DevHygiene.catalog(home: home) {
                 for path in eco.paths where FileManager.default.fileExists(atPath: path) {
-                    let bytes = Self.directorySize(path)
+                    let bytes = DevHygiene.directorySize(path)
                     if bytes > 0 { out.append(Row(ecosystem: eco.name, path: path, bytes: bytes)) }
                 }
             }
@@ -91,18 +91,5 @@ struct DevHygieneView: View {
         }.value
         rows = found
         scanning = false
-    }
-
-    /// Recursive allocated size of a directory. Off-main only.
-    private static func directorySize(_ path: String) -> Int64 {
-        let url = URL(fileURLWithPath: path)
-        let keys: Set<URLResourceKey> = [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey]
-        guard let en = FileManager.default.enumerator(at: url, includingPropertiesForKeys: Array(keys)) else { return 0 }
-        var total: Int64 = 0
-        for case let file as URL in en {
-            let v = try? file.resourceValues(forKeys: keys)
-            total += Int64(v?.totalFileAllocatedSize ?? v?.fileAllocatedSize ?? 0)
-        }
-        return total
     }
 }
