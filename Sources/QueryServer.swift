@@ -150,31 +150,40 @@ final class QueryServer {
     /// client, and an allow-all grant would let any web page read /snapshot
     /// (hostname, process command lines) cross-origin. The real clients —
     /// curl and the stdio MCP bridge — don't need CORS at all.
-    static func httpHead(contentLength: Int) -> String {
+    static let jsonContentType = "application/json; charset=utf-8"
+    /// Prometheus text exposition format, version 0.0.4 — the de-facto scrape
+    /// content type. Served only by `/metrics?format=prometheus`.
+    static let prometheusContentType = "text/plain; version=0.0.4; charset=utf-8"
+
+    static func httpHead(contentLength: Int, contentType: String = jsonContentType) -> String {
         return "HTTP/1.1 200 OK\r\n"
-            + "Content-Type: application/json; charset=utf-8\r\n"
+            + "Content-Type: \(contentType)\r\n"
             + "Content-Length: \(contentLength)\r\n"
             + "Cache-Control: no-store\r\n"
             + "Connection: close\r\n"
             + "\r\n"
     }
 
-    private func send(_ json: String, on conn: NWConnection) {
-        let body = Data(json.utf8)
-        var payload = Data(Self.httpHead(contentLength: body.count).utf8)
+    private func send(_ response: (body: String, contentType: String), on conn: NWConnection) {
+        let body = Data(response.body.utf8)
+        var payload = Data(Self.httpHead(contentLength: body.count, contentType: response.contentType).utf8)
         payload.append(body)
         conn.send(content: payload, completion: .contentProcessed { _ in conn.cancel() })
     }
 
     // MARK: - Routing
 
-    func route(_ raw: String) -> String {
+    /// Returns the response body and its content type. Everything is JSON
+    /// except `/metrics?format=prometheus`, which is text exposition.
+    func route(_ raw: String) -> (body: String, contentType: String) {
+        func json(_ s: String) -> (body: String, contentType: String) { (s, Self.jsonContentType) }
+
         guard let first = raw.split(separator: "\r\n", maxSplits: 1).first else {
-            return Self.errorJSON("malformed request")
+            return json(Self.errorJSON("malformed request"))
         }
         let parts = first.split(separator: " ")
         guard parts.count >= 2, parts[0] == "GET" else {
-            return Self.errorJSON("only GET supported")
+            return json(Self.errorJSON("only GET supported"))
         }
         let target = String(parts[1])
         let split = target.split(separator: "?", maxSplits: 1)
@@ -183,19 +192,22 @@ final class QueryServer {
 
         switch path {
         case "/health":
-            return "{\"ok\":true,\"app\":\"Burrow\",\"port\":\(self.port)}"
+            return json("{\"ok\":true,\"app\":\"Burrow\",\"port\":\(self.port)}")
 
         case "/info":
-            return self.routeInfo()
+            return json(self.routeInfo())
 
         case "/snapshot":
-            return self.routeSnapshot()
+            return json(self.routeSnapshot())
 
         case "/metrics":
-            return self.routeMetrics(query: query)
+            if query["format"] == "prometheus" {
+                return (self.routeMetricsPrometheus(), Self.prometheusContentType)
+            }
+            return json(self.routeMetrics(query: query))
 
         default:
-            return Self.errorJSON("unknown route")
+            return json(Self.errorJSON("unknown route"))
         }
     }
 
@@ -237,6 +249,19 @@ final class QueryServer {
         // Inline the stored JSON verbatim under a known key. Callers that
         // want typed access can decode the value against the Mole schema.
         return "{\"ts\":\(row.ts),\"snapshot\":\(row.json)}"
+    }
+
+    /// `GET /metrics?format=prometheus` → the latest snapshot rendered as
+    /// Prometheus text exposition (roadmap B7), so a dev can point Grafana at
+    /// their own Mac. A missing or undecodable snapshot yields a comment line
+    /// rather than an error JSON — scrapers tolerate an empty target.
+    private func routeMetricsPrometheus() -> String {
+        guard let row = self.metrics.latestRaw(),
+              let status = try? JSONDecoder().decode(MoleStatus.self, from: Data(row.json.utf8))
+        else {
+            return "# burrow: no snapshot available\n"
+        }
+        return MetricsPrometheus.exposition(from: status)
     }
 
     private func routeMetrics(query: [String: String]) -> String {
