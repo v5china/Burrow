@@ -291,6 +291,8 @@
 /* Home (Overview / History / Activity / Report) + Explain */
 "Overview" = "概览";
 "Report" = "报告";
+"Doctor" = "诊断";
+"Diagnostics" = "系统诊断";
 "Explain" = "解读";
 
 /* Language switch */

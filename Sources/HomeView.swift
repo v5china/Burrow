@@ -26,6 +26,7 @@ struct HomeView: View {
         case history = "History"
         case activity = "Activity"
         case report = "Report"
+        case doctor = "Doctor"
         var id: String { rawValue }
     }
 
@@ -93,6 +94,7 @@ struct HomeView: View {
         case .history:  HistoryView(db: db, live: live, feeds: feeds)
         case .activity: ActivityView(feeds: feeds)
         case .report:   ReportView(db: db)
+        case .doctor:   DoctorView(db: db)
         }
     }
 }
