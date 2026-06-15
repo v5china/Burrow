@@ -21,6 +21,8 @@ enum WeeklyReport {
         /// Negative = health declined since the period start; nil = unknown.
         var batteryHealthDeltaPct: Double?
         var forecast: DiskForecast.Projection?
+        /// Regressed processes from AnomalyScan (A.2); empty = nothing flagged.
+        var anomalies: [AnomalyScan.Finding] = []
     }
 
     static func markdown(_ i: Input) -> String {
@@ -52,6 +54,14 @@ enum WeeklyReport {
 
         if let d = i.batteryHealthDeltaPct, d < 0 {
             out += "## Battery\n- Health down **\(String(format: "%.1f", -d))%** since the period start.\n\n"
+        }
+
+        if !i.anomalies.isEmpty {
+            out += "## Changes\nProcesses using notably more CPU than their recent baseline:\n"
+            for a in i.anomalies.prefix(5) {
+                out += "- \(a.process) — now ~\(Int(a.recentMedian.rounded()))% CPU (was ~\(Int(a.baselineMedian.rounded()))%)\n"
+            }
+            out += "\n"
         }
 
         // Persistence items that appeared this period — a light security note.

@@ -25,7 +25,11 @@ final class ThresholdMonitor {
         let r = ThresholdAlerts.evaluate(s, ts: Int(at.timeIntervalSince1970), states: states)
         states = r.states
         for fire in r.fires {
-            BurrowNotifier.shared.thresholdAlert(ruleID: fire.ruleID, value: fire.value)
+            // thresholdAlert is main-actor-isolated; hop to it (we're already
+            // on main, but evaluate is statically nonisolated).
+            Task { @MainActor in
+                BurrowNotifier.shared.thresholdAlert(ruleID: fire.ruleID, value: fire.value)
+            }
         }
     }
 }

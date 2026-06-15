@@ -20,6 +20,7 @@ enum ReportComposer {
             .map { (name: $0.name, cpuSeconds: $0.estCPUSeconds) }
         return WeeklyReport.Input(periodDays: days, spaceReclaimedBytes: nil,
                                   topEnergy: top, newLoginItems: [],
-                                  batteryHealthDeltaPct: nil, forecast: forecast)
+                                  batteryHealthDeltaPct: nil, forecast: forecast,
+                                  anomalies: AnomalyScan.scan(metrics: metrics, now: now))
     }
 }

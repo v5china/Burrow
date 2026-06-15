@@ -19,6 +19,16 @@ enum AnomalyScan {
         let baselineMedian: Double
     }
 
+    /// Convenience: pull recent (last 24h) vs baseline (prior 14d) per-process
+    /// CPU from the store and flag regressions. The window split the roadmap
+    /// specifies for A.2.
+    static func scan(metrics: MetricsStore, now: Int) -> [Finding] {
+        let day = 86_400
+        let recent = metrics.processCPUSamples(.init(since: now - day, until: now))
+        let baseline = metrics.processCPUSamples(.init(since: now - 15 * day, until: now - day))
+        return cpuFindings(baseline: baseline, recent: recent)
+    }
+
     /// Flag every process whose recent CPU clears its own baseline per the
     /// Anomaly rule, worst (highest recent median) first.
     static func cpuFindings(baseline: [String: [Double]],

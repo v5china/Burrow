@@ -25,7 +25,7 @@ final class ReportComposerTests: XCTestCase {
         try? FileManager.default.removeItem(at: tempDir)
     }
 
-    private func snapshot(freeGB: Int64, proc: String) -> String {
+    private func snapshot(freeGB: Int64, proc: String, cpu: Double = 80) -> String {
         let total: Int64 = 500_000_000_000
         let used = total - freeGB * 1_000_000_000
         return """
@@ -36,7 +36,7 @@ final class ReportComposerTests: XCTestCase {
          "memory":{"used":100,"total":200,"used_percent":50,"swap_used":0,"swap_total":0,"pressure":""},
          "disk_io":{"read_rate":0,"write_rate":0},
          "disks":[{"mount":"/","used":\(used),"total":\(total),"used_percent":50,"external":false}],
-         "top_processes":[{"pid":1,"name":"\(proc)","command":"/bin/\(proc)","cpu":80,"memory":5}]}
+         "top_processes":[{"pid":1,"name":"\(proc)","command":"/bin/\(proc)","cpu":\(cpu),"memory":5}]}
         """
     }
 
@@ -53,5 +53,22 @@ final class ReportComposerTests: XCTestCase {
         XCTAssertNil(input.spaceReclaimedBytes, "cleanup history isn't a v1 source")
         XCTAssertNotNil(input.forecast?.daysUntilFull, "steady decline yields a forecast")
         XCTAssertEqual(input.topEnergy.first?.name, "xcode")
+    }
+
+    func testGather_includesAnomalies() throws {
+        let now = Int(Date().timeIntervalSince1970)
+        let day = 86_400
+        // Baseline window (prior 14d): "hog" idles low.
+        for k in 0..<8 {
+            try db.insert(prefix: MetricsStore.snapshotPrefix, ts: now - 10 * day - k * 60,
+                          json: snapshot(freeGB: 100, proc: "hog", cpu: 5))
+        }
+        // Recent window (last 24h): "hog" is pegged.
+        for k in 0..<8 {
+            try db.insert(prefix: MetricsStore.snapshotPrefix, ts: now - 3600 - k * 60,
+                          json: snapshot(freeGB: 100, proc: "hog", cpu: 60))
+        }
+        let input = ReportComposer.gather(metrics: MetricsStore(db: db), days: 7, now: now)
+        XCTAssertTrue(input.anomalies.contains { $0.process == "hog" }, "a regressed process is flagged")
     }
 }

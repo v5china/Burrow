@@ -71,6 +71,18 @@ final class WeeklyReportTests: XCTestCase {
         XCTAssertFalse(WeeklyReport.markdown(base()).contains("New startup items"))
     }
 
+    func testMarkdown_anomalies_rendersChangesSection() {
+        var i = base()
+        i.anomalies = [.init(process: "WindowServer", recentMedian: 45, baselineMedian: 20)]
+        let md = WeeklyReport.markdown(i)
+        XCTAssertTrue(md.contains("## Changes"))
+        XCTAssertTrue(md.contains("WindowServer"))
+    }
+
+    func testMarkdown_noAnomalies_omitsChangesSection() {
+        XCTAssertFalse(WeeklyReport.markdown(base()).contains("## Changes"))
+    }
+
     func testMarkdown_batteryDecline_shown_butImprovementHidden() {
         var i = base(); i.batteryHealthDeltaPct = -2.5
         XCTAssertTrue(WeeklyReport.markdown(i).contains("Health down"))
