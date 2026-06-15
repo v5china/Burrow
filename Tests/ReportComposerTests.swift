@@ -58,17 +58,22 @@ final class ReportComposerTests: XCTestCase {
     func testGather_includesAnomalies() throws {
         let now = Int(Date().timeIntervalSince1970)
         let day = 86_400
-        // Baseline window (prior 14d): "hog" idles low.
+        // Rows must be spaced wider than the query's down-sample stride
+        // (~28 min over a 14-day baseline, ~2 min over 24h) or they collapse
+        // into one bucket. Baseline (prior 14d): "hog" idles low, 2h apart.
         for k in 0..<8 {
-            try db.insert(prefix: MetricsStore.snapshotPrefix, ts: now - 10 * day - k * 60,
+            try db.insert(prefix: MetricsStore.snapshotPrefix, ts: now - 5 * day + k * 7200,
                           json: snapshot(freeGB: 100, proc: "hog", cpu: 5))
         }
-        // Recent window (last 24h): "hog" is pegged.
+        // Recent (last 24h): "hog" is pegged, 10 min apart.
         for k in 0..<8 {
-            try db.insert(prefix: MetricsStore.snapshotPrefix, ts: now - 3600 - k * 60,
+            try db.insert(prefix: MetricsStore.snapshotPrefix, ts: now - 600 - k * 600,
                           json: snapshot(freeGB: 100, proc: "hog", cpu: 60))
         }
-        let input = ReportComposer.gather(metrics: MetricsStore(db: db), days: 7, now: now)
-        XCTAssertTrue(input.anomalies.contains { $0.process == "hog" }, "a regressed process is flagged")
+        let found = AnomalyScan.scan(metrics: MetricsStore(db: db), now: now)
+        XCTAssertTrue(found.contains { $0.process == "hog" },
+                      "scan returned: \(found.map { "\($0.process) \($0.recentMedian)/\($0.baselineMedian)" })")
+        XCTAssertTrue(ReportComposer.gather(metrics: MetricsStore(db: db), days: 7, now: now)
+            .anomalies.contains { $0.process == "hog" })
     }
 }
