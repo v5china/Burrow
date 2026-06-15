@@ -76,6 +76,19 @@ final class MCPForecastTests: XCTestCase {
         XCTAssertTrue(o["days_until_full"] is NSNull, "a flat disk never fills → null, not a bare date")
     }
 
+    func testReport_includesTitleAndForecast() throws {
+        let now = Int(Date().timeIntervalSince1970)
+        let day = 86_400
+        for d in 0...30 {  // steady decline so the report has a forecast line
+            let free = Int64(130_000_000_000) - Int64(d) * 1_000_000_000
+            try db.insert(prefix: MetricsStore.snapshotPrefix,
+                          ts: now - (30 - d) * day, json: snapshot(freeBytes: free))
+        }
+        let md = try catalog.call(name: "burrow_report", arguments: ["days": 60])
+        XCTAssertTrue(md.contains("# Burrow weekly report"), md)
+        XCTAssertTrue(md.contains("fills in"), "a steady decline should yield a forecast line")
+    }
+
     func testDiskForecast_isListedInCatalog() {
         let names = catalog.descriptors().compactMap { $0["name"] as? String }
         XCTAssertTrue(names.contains("burrow_disk_forecast"))

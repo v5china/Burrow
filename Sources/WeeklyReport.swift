@@ -14,7 +14,8 @@ import Foundation
 enum WeeklyReport {
     struct Input {
         var periodDays: Int
-        var spaceReclaimedBytes: Int64
+        /// nil = cleanup history unavailable (distinct from a genuine zero).
+        var spaceReclaimedBytes: Int64?
         var topEnergy: [(name: String, cpuSeconds: Double)]
         var newLoginItems: [String]
         /// Negative = health declined since the period start; nil = unknown.
@@ -26,9 +27,13 @@ enum WeeklyReport {
         var out = "# Burrow weekly report\n\n_Last \(i.periodDays) days._\n\n"
 
         out += "## Cleanup\n"
-        out += i.spaceReclaimedBytes > 0
-            ? "- Freed **\(Fmt.bytes(i.spaceReclaimedBytes))** this period.\n\n"
-            : "- No space reclaimed this period.\n\n"
+        if let reclaimed = i.spaceReclaimedBytes {
+            out += reclaimed > 0
+                ? "- Freed **\(Fmt.bytes(reclaimed))** this period.\n\n"
+                : "- No space reclaimed this period.\n\n"
+        } else {
+            out += "- Cleanup history unavailable.\n\n"
+        }
 
         // Only name a fill date when the forecaster was willing to — never a
         // bare date (see DiskForecast).

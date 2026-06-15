@@ -32,6 +32,13 @@ final class WeeklyReportTests: XCTestCase {
         XCTAssertTrue(WeeklyReport.markdown(base()).contains("No space reclaimed"))
     }
 
+    func testMarkdown_reclaimUnknown_saysUnavailable() {
+        var i = base(); i.spaceReclaimedBytes = nil
+        let md = WeeklyReport.markdown(i)
+        XCTAssertTrue(md.contains("unavailable"), "nil reclaimed is 'unavailable', not a false zero")
+        XCTAssertFalse(md.contains("No space reclaimed"))
+    }
+
     func testMarkdown_forecastPresent_namesAWeeksPhrase() {
         var i = base()
         i.forecast = .init(daysUntilFull: 21, slopeBytesPerDay: -1, basisDays: 30)

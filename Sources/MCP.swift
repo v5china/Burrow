@@ -299,6 +299,17 @@ struct ToolCatalog {
                 ] as [String: Any],
             ],
             [
+                "name": "burrow_report",
+                "description": "A weekly system digest as Markdown over the last `days` (default 7, 1-90): disk-full forecast, top energy users (by estimated CPU-seconds), and cleanup summary. The same artifact the Home Report card shows. Read-only.",
+                "inputSchema": [
+                    "type": "object",
+                    "properties": [
+                        "days": ["type": "integer", "minimum": 1, "maximum": 90],
+                    ],
+                    "additionalProperties": false,
+                ] as [String: Any],
+            ],
+            [
                 "name": "burrow_info",
                 "description": "Burrow's own state: list of prefixes with row counts + staleness, current retention setting. Use when diagnosing whether data is flowing.",
                 "inputSchema": [
@@ -424,6 +435,8 @@ struct ToolCatalog {
             return try self.callDiskForecast(arguments)
         case "burrow_diff":
             return self.callDiff(arguments)
+        case "burrow_report":
+            return self.callReport(arguments)
         case "burrow_info":
             return self.callInfo()
         case "burrow_cleanup_history":
@@ -589,6 +602,24 @@ struct ToolCatalog {
             + "\"processes_entered\":\(arr(change.added)),\"processes_left\":\(arr(change.removed)),"
             + "\"disk_free_delta_bytes\":\(freeOf(last.status) - freeOf(first.status)),"
             + "\"note\":\"app, login-item, and port inventories are not yet tracked across time\"}"
+    }
+
+    /// `burrow_report` — the weekly digest as Markdown (the tool's text
+    /// payload IS the markdown). v1 composes the disk forecast + top energy
+    /// from snapshots; cleanup/battery/login-item sections fill in as their
+    /// data sources land (so they're omitted/"unavailable" rather than faked).
+    private func callReport(_ args: [String: Any]) -> String {
+        let days = max(1, min((args["days"] as? Int) ?? 7, 90))
+        let now = Int(Date().timeIntervalSince1970)
+        let w = MetricsStore.Window(since: now - days * 86_400, until: now)
+        let series = self.metrics.diskFreeSeries(mount: nil, w)
+        let forecast = series.count >= 2 ? DiskForecast.forecast(series, now: now) : nil
+        let top = self.metrics.processWindow(w).ranked(by: .cpuTime, limit: 5)
+            .map { (name: $0.name, cpuSeconds: $0.estCPUSeconds) }
+        let input = WeeklyReport.Input(periodDays: days, spaceReclaimedBytes: nil,
+                                       topEnergy: top, newLoginItems: [],
+                                       batteryHealthDeltaPct: nil, forecast: forecast)
+        return WeeklyReport.markdown(input)
     }
 
     private func callInfo() -> String {
