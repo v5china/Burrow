@@ -319,6 +319,15 @@ struct ToolCatalog {
                 ] as [String: Any],
             ],
             [
+                "name": "burrow_ports",
+                "description": "Listening TCP/UDP ports with the owning process (pid, name, uid). Native enumeration (no lsof). Read-only — to free a port, kill the process yourself.",
+                "inputSchema": [
+                    "type": "object",
+                    "properties": [String: Any](),
+                    "additionalProperties": false,
+                ] as [String: Any],
+            ],
+            [
                 "name": "burrow_info",
                 "description": "Burrow's own state: list of prefixes with row counts + staleness, current retention setting. Use when diagnosing whether data is flowing.",
                 "inputSchema": [
@@ -448,6 +457,8 @@ struct ToolCatalog {
             return self.callReport(arguments)
         case "burrow_doctor":
             return self.callDoctor(arguments)
+        case "burrow_ports":
+            return self.callPorts(arguments)
         case "burrow_info":
             return self.callInfo()
         case "burrow_cleanup_history":
@@ -660,6 +671,19 @@ struct ToolCatalog {
         if s.contains("critical") { return .critical }
         if s.contains("warn") { return .warning }
         return .normal
+    }
+
+    /// `burrow_ports` — listening sockets + owning process, via native
+    /// enumeration. Read-only; killing is a GUI-only, confirm-gated action.
+    private func callPorts(_ args: [String: Any]) -> String {
+        func esc(_ s: String) -> String {
+            "\"\(s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\""
+        }
+        let ports = PortEnumerator.listening()
+        let items = ports.map { p in
+            "{\"pid\":\(p.pid),\"process\":\(esc(p.process)),\"port\":\(p.port),\"proto\":\"\(p.proto)\",\"uid\":\(p.uid)}"
+        }
+        return "{\"count\":\(ports.count),\"ports\":[\(items.joined(separator: ","))]}"
     }
 
     private func callInfo() -> String {
