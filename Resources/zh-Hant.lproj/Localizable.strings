@@ -288,8 +288,9 @@
 "Close" = "關閉";
 "Mole CLI not found" = "找不到 Mole CLI";
 
-/* Home (Overview / History / Activity) + Explain */
+/* Home (Overview / History / Activity / Report) + Explain */
 "Overview" = "總覽";
+"Report" = "報告";
 "Explain" = "解讀";
 
 /* Language switch */
