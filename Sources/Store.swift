@@ -387,6 +387,13 @@ enum Store {
         set { write(newValue, "startup_baseline_json") }
     }
 
+    /// Threshold alerts (CPU pegged / memory pressure high). Off by default —
+    /// a taste thing, like the smart reminders.
+    static var thresholdAlertsEnabled: Bool {
+        get { d.object(forKey: "threshold_alerts_enabled") as? Bool ?? false }
+        set { write(newValue, "threshold_alerts_enabled") }
+    }
+
     // Reminder throttle state (not user-facing): hysteresis flags so a
     // metric hovering at its threshold can't flap, timestamps for the
     // weekly cooldowns. See ReminderRules (Notifications.swift).

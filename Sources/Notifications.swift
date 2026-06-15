@@ -140,6 +140,24 @@ final class BurrowNotifier: NSObject {
         post(content, id: "burrow-op-\(UUID().uuidString)")
     }
 
+    /// Post a threshold-alert notification (D.12). Called by ThresholdMonitor
+    /// when a CPU/memory rule fires (once per episode).
+    func thresholdAlert(ruleID: String, value: Double) {
+        guard !inert else { return }
+        let title: String, body: String
+        switch ruleID {
+        case "cpu":
+            title = NSLocalizedString("CPU usage is high", comment: "")
+            body = String(format: NSLocalizedString("CPU has been pegged at %.0f%%.", comment: ""), value)
+        case "memory":
+            title = NSLocalizedString("Memory pressure is high", comment: "")
+            body = String(format: NSLocalizedString("Memory is at %.0f%%.", comment: ""), value)
+        default:
+            return
+        }
+        postReminder(title: title, body: body, pane: nil, id: "burrow-threshold-\(ruleID)")
+    }
+
     // MARK: Smart reminders
 
     /// Started once from AppDelegate.startServices. Hourly sweep — each

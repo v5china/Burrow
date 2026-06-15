@@ -302,6 +302,10 @@
 "Quit this process?" = "退出此程序？";
 "A new startup item appeared" = "出現了新的啟動項";
 "“%@” now launches automatically. If you didn't add it, review it." = "“%@” 現在會自動啟動。如果不是你新增的，請檢查它。";
+"CPU usage is high" = "CPU 使用率過高";
+"CPU has been pegged at %.0f%%." = "CPU 已持續滿載於 %.0f%%。";
+"Memory pressure is high" = "記憶體壓力過高";
+"Memory is at %.0f%%." = "記憶體使用率為 %.0f%%。";
 "Explain" = "解讀";
 
 /* Language switch */
