@@ -287,6 +287,18 @@ struct ToolCatalog {
                 ] as [String: Any],
             ],
             [
+                "name": "burrow_diff",
+                "description": "What changed between the snapshot nearest `since` (unix seconds; or use `minutes` back from now, default 1440) and the latest: which processes entered/left the top list, and the free-space delta on the largest volume. v1 scope — app, login-item, and port inventories aren't tracked across time yet, so they're not diffed. Read-only.",
+                "inputSchema": [
+                    "type": "object",
+                    "properties": [
+                        "since": ["type": "integer", "description": "Unix-seconds lower bound. Overrides `minutes`."],
+                        "minutes": ["type": "integer", "minimum": 1],
+                    ],
+                    "additionalProperties": false,
+                ] as [String: Any],
+            ],
+            [
                 "name": "burrow_info",
                 "description": "Burrow's own state: list of prefixes with row counts + staleness, current retention setting. Use when diagnosing whether data is flowing.",
                 "inputSchema": [
@@ -410,6 +422,8 @@ struct ToolCatalog {
             return try self.callProcessUsage(arguments)
         case "burrow_disk_forecast":
             return try self.callDiskForecast(arguments)
+        case "burrow_diff":
+            return self.callDiff(arguments)
         case "burrow_info":
             return self.callInfo()
         case "burrow_cleanup_history":
@@ -543,6 +557,38 @@ struct ToolCatalog {
         return "{\"mount\":\"\(mountStr)\",\"basis_days\":\(String(format: "%.1f", p.basisDays)),"
             + "\"slope_bytes_per_day\":\(Int64(p.slopeBytesPerDay.rounded())),"
             + "\"days_until_full\":\(daysStr),\"samples\":\(series.count)}"
+    }
+
+    /// `burrow_diff` — what changed since a point in time. v1 diffs top-process
+    /// membership and free-space delta from the snapshots already on disk;
+    /// app/login-item/port inventories aren't yet persisted over time.
+    private func callDiff(_ args: [String: Any]) -> String {
+        let now = Int(Date().timeIntervalSince1970)
+        let since: Int
+        if let s = args["since"] as? Int {
+            since = s
+        } else {
+            let m = max(1, min((args["minutes"] as? Int) ?? 1440, 1_000_000))
+            since = now - m * 60
+        }
+        let snaps = self.metrics.snapshots(MetricsStore.Window(since: since, until: now)).snapshots
+        guard let first = snaps.first, let last = snaps.last, snaps.count >= 2 else {
+            return "{\"error\":\"need at least two snapshots in the window\",\"since_ts\":\(since),\"until_ts\":\(now)}"
+        }
+        let change = InventoryDiff.diff(old: (first.status.topProcesses ?? []).map(\.name),
+                                        new: (last.status.topProcesses ?? []).map(\.name))
+        func freeOf(_ s: MoleStatus) -> Int64 {
+            guard let d = s.disks.max(by: { $0.total < $1.total }) else { return 0 }
+            return Int64(d.total > d.used ? d.total - d.used : 0)
+        }
+        func arr(_ xs: [String]) -> String {
+            "[" + xs.map { "\"\($0.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\"" }
+                .joined(separator: ",") + "]"
+        }
+        return "{\"since_ts\":\(first.ts),\"until_ts\":\(last.ts),"
+            + "\"processes_entered\":\(arr(change.added)),\"processes_left\":\(arr(change.removed)),"
+            + "\"disk_free_delta_bytes\":\(freeOf(last.status) - freeOf(first.status)),"
+            + "\"note\":\"app, login-item, and port inventories are not yet tracked across time\"}"
     }
 
     private func callInfo() -> String {
