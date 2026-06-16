@@ -319,6 +319,10 @@
 "No restorable items found." = "未找到可復原的項目。";
 "Top processes in selection" = "所選區間內的主要程序";
 "No process samples in that window." = "該區間內沒有程序取樣。";
+"Full in ~%@" = "約 %@ 後寫滿";
+"%d days" = "%d 天";
+"%d weeks" = "%d 週";
+"%d months" = "%d 個月";
 "A new startup item appeared" = "出現了新的啟動項";
 "“%@” now launches automatically. If you didn't add it, review it." = "“%@” 現在會自動啟動。如果不是你新增的，請檢查它。";
 "CPU usage is high" = "CPU 使用率過高";
