@@ -12,7 +12,7 @@ final class DoctorTests: XCTestCase {
     private func healthy() -> Doctor.Input {
         .init(fullDiskAccess: true, moInstalled: true, pressure: .normal,
               diskFreeBytes: 200_000_000_000, diskTotalBytes: 500_000_000_000,
-              recentErrorCount: 0, lastBackupDaysAgo: 1)
+              recentErrorCount: 0, lastBackupDaysAgo: 1, smartVerified: true)
     }
 
     private func check(_ report: [Doctor.Check], _ name: String) -> Doctor.Check? {
@@ -21,7 +21,7 @@ final class DoctorTests: XCTestCase {
 
     func testReport_healthyMachine_allOK() {
         let r = Doctor.report(healthy())
-        XCTAssertEqual(r.count, 6)
+        XCTAssertEqual(r.count, 7)
         XCTAssertTrue(r.allSatisfy { $0.level == .ok })
     }
 
@@ -33,6 +33,11 @@ final class DoctorTests: XCTestCase {
     func testReport_noBackup_warns() {
         var i = healthy(); i.lastBackupDaysAgo = nil
         XCTAssertEqual(check(Doctor.report(i), "Backups")?.level, .warn)
+    }
+
+    func testReport_smartFailing_fails() {
+        var i = healthy(); i.smartVerified = false
+        XCTAssertEqual(check(Doctor.report(i), "Disk health")?.level, .fail)
     }
 
     func testReport_noEngine_fails() {

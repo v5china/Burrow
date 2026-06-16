@@ -31,12 +31,14 @@ enum Doctor {
         var recentErrorCount: Int
         /// Days since the last Time Machine backup; nil = none found / unknown.
         var lastBackupDaysAgo: Int? = nil
+        /// SMART verdict: true = verified, false = failing, nil = unreadable.
+        var smartVerified: Bool? = nil
     }
 
     /// One `Check` per facet, in a stable order. Each verdict is independent;
     /// callers can sort by `level` to surface failures first.
     static func report(_ i: Input) -> [Check] {
-        [engine(i), permissions(i), memory(i), disk(i), backup(i), errors(i)]
+        [engine(i), permissions(i), memory(i), disk(i), diskHealth(i), backup(i), errors(i)]
     }
 
     private static func engine(_ i: Input) -> Check {
@@ -70,6 +72,14 @@ enum Doctor {
             return Check(name: "Disk space", level: .warn, detail: "under 10% free")
         }
         return Check(name: "Disk space", level: .ok, detail: "\(Int(freePct.rounded()))% free")
+    }
+
+    private static func diskHealth(_ i: Input) -> Check {
+        switch i.smartVerified {
+        case .some(true):  return Check(name: "Disk health", level: .ok, detail: "SMART status: verified")
+        case .some(false): return Check(name: "Disk health", level: .fail, detail: "SMART status: failing — back up now")
+        case .none:        return Check(name: "Disk health", level: .ok, detail: "SMART not reported")
+        }
     }
 
     private static func backup(_ i: Input) -> Check {

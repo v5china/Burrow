@@ -72,6 +72,7 @@ struct DoctorView: View {
             moInstalled: moInstalled, pressure: pressure,
             diskFreeBytes: free, diskTotalBytes: total,
             recentErrorCount: MetricsStore.driftCounters.decodeSkippedTotal,
-            lastBackupDaysAgo: BackupStatus.lastBackupDaysAgo()))
+            lastBackupDaysAgo: BackupStatus.lastBackupDaysAgo(),
+            smartVerified: DiskHealth.smartVerified()))
     }
 }

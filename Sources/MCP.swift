@@ -702,7 +702,8 @@ struct ToolCatalog {
             pressure: Self.mapPressure(latest?.memory.pressure),
             diskFreeBytes: free, diskTotalBytes: total,
             recentErrorCount: MetricsStore.driftCounters.decodeSkippedTotal,
-            lastBackupDaysAgo: BackupStatus.lastBackupDaysAgo())
+            lastBackupDaysAgo: BackupStatus.lastBackupDaysAgo(),
+            smartVerified: DiskHealth.smartVerified())
         func esc(_ s: String) -> String {
             "\"\(s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\""
         }
