@@ -39,7 +39,7 @@ struct StatusView: View {
                         gpuTile(s).frame(minHeight: row1H)
                     }
                     HStack(spacing: 13) {
-                        DiskCard(s: s, db: model.db, liveRead: io.readMBs, liveWrite: io.writeMBs, minHeight: row2H)
+                        DiskCard(s: s, liveRead: io.readMBs, liveWrite: io.writeMBs, minHeight: row2H, db: model.db)
                         netTile(s).frame(minHeight: row2H)
                         fanTile(s).frame(minHeight: row2H)
                     }
