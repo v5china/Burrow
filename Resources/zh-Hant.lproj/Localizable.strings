@@ -317,6 +317,8 @@
 "Restore last cleanup" = "復原上次清理";
 "Only Trash-based removals can be restored — cache deletions are permanent." = "僅可復原移到垃圾桶的項目——快取刪除是永久性的。";
 "No restorable items found." = "未找到可復原的項目。";
+"Top processes in selection" = "所選區間內的主要程序";
+"No process samples in that window." = "該區間內沒有程序取樣。";
 "A new startup item appeared" = "出現了新的啟動項";
 "“%@” now launches automatically. If you didn't add it, review it." = "“%@” 現在會自動啟動。如果不是你新增的，請檢查它。";
 "CPU usage is high" = "CPU 使用率過高";

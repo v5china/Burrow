@@ -216,6 +216,10 @@ struct HistoryView: View {
     @State private var snapshot: HistorySnapshot = HistorySnapshot()
     @State private var loading: Bool = false
     @State private var procMetric: ProcMetric = .cpu
+    // Spike forensics (A.1): drag-select on the line chart → top processes.
+    @State private var spikeDragStart: CGFloat?
+    @State private var spikeDragCurrent: CGFloat?
+    @State private var spikeWindow: SpikeWindow?
     /// The currently-subscribed board feed — held so the toolbar's manual
     /// refresh can poke it; lifecycle belongs to `.task(id: range)` below.
     @State private var board: Feed<HistorySnapshot>?
@@ -430,6 +434,38 @@ struct HistoryView: View {
                         }
                     }
                     .chartXScale(domain: snapshot.windowSince...snapshot.windowUntil)
+                    .chartOverlay { proxy in
+                        GeometryReader { geo in
+                            if let anchor = proxy.plotFrame {
+                                let plot = geo[anchor]
+                                Rectangle().fill(Color.clear).contentShape(Rectangle())
+                                    .gesture(DragGesture(minimumDistance: 4)
+                                        .onChanged { v in
+                                            if spikeDragStart == nil { spikeDragStart = v.startLocation.x - plot.minX }
+                                            spikeDragCurrent = v.location.x - plot.minX
+                                        }
+                                        .onEnded { v in
+                                            let x0 = spikeDragStart ?? 0
+                                            let x1 = v.location.x - plot.minX
+                                            spikeDragStart = nil; spikeDragCurrent = nil
+                                            let lo = min(x0, x1), hi = max(x0, x1)
+                                            guard hi - lo > 4,
+                                                  let d0 = proxy.value(atX: lo, as: Date.self),
+                                                  let d1 = proxy.value(atX: hi, as: Date.self) else { return }
+                                            spikeWindow = SpikeWindow(since: Int(d0.timeIntervalSince1970),
+                                                                      until: Int(d1.timeIntervalSince1970))
+                                        })
+                                if let s = spikeDragStart, let c = spikeDragCurrent {
+                                    Rectangle().fill(Brand.textSecondary.opacity(0.18))
+                                        .frame(width: abs(c - s), height: plot.height)
+                                        .position(x: plot.minX + min(s, c) + abs(c - s) / 2, y: plot.midY)
+                                }
+                            }
+                        }
+                    }
+                    .sheet(item: $spikeWindow) { w in
+                        SpikeSheet(db: db, window: w, onClose: { spikeWindow = nil })
+                    }
                     .chartXAxis {
                         AxisMarks(values: .automatic(desiredCount: style.desiredCount)) { _ in
                             AxisGridLine().foregroundStyle(Brand.hairline)
