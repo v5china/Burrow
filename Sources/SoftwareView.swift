@@ -60,8 +60,12 @@ struct SoftwareView: View {
                 bottomBar.padding(.horizontal, 18).padding(.vertical, 10)
             }
         }
-        .onAppear { if isActive { model.startIfNeeded() } }
-        .onChange(of: isActive) { _, now in if now { model.startIfNeeded() } }
+        // Pre-warm both LOCAL segments when the pane opens, so switching to
+        // Startup is instant instead of a fresh scan-on-click. Updates is left
+        // out on purpose — it reaches out to Apple / vendor appcasts, so it
+        // stays gated behind an explicit check (privacy).
+        .onAppear { if isActive { model.startIfNeeded(); startup.startIfNeeded() } }
+        .onChange(of: isActive) { _, now in if now { model.startIfNeeded(); startup.startIfNeeded() } }
     }
 
     // MARK: - Toolbar

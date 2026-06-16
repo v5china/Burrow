@@ -2,108 +2,501 @@
 //  TuneUpView.swift
 //  Burrow
 //
-//  Tune-Up pane (roadmap F / #77): gathers recommendations, splits them into a
-//  one-click *safe set* (reversible cache clears) and a *review set*
-//  (destructive / behaviour-changing, e.g. startup items), via the tested
-//  TuneUp selection logic. v1 sources: dev-ecosystem caches + controllable
-//  startup items.
+//  The Tune-Up pane (#77): a persistent "review everything, then act in one
+//  pass" surface. On entry it reads the cached scan (instant) or runs the
+//  read-only scans once, then shows six review sections:
 //
-//  NOTE (hand-test): compile-verified only. Verify the scan, the reclaimable
-//  total, and that "Run safe set" only trashes caches (reversible).
+//    Safe set (reversible, one-tap runnable here):
+//      • Cleanable junk   — the clean dry-run total
+//      • Maintenance      — the optimize task list
+//    Review-only (flagged here, acted on in their own panes):
+//      • Apps to uninstall — your largest installed apps
+//      • App & Homebrew updates — deep-link (kept click-gated for privacy)
+//      • Startup items     — new since the baseline + what's controllable
+//      • Big disk users    — top space hogs under your home folder
+//
+//  "Run the safe set" shows a visible plan, then runs Clean → Optimize through
+//  the same OperationFlow the dedicated tabs use (each elevated step prompts
+//  separately — honest auth, no pooled helper yet). The scan snapshot and the
+//  last-run summary persist across pane switches AND relaunch via TuneUpModel.
+//
+//  NOTE (hand-test): compile-verified only. Verify: first open scans and
+//  persists; re-open is instant; "Run the safe set" runs clean then optimize
+//  with two auth prompts and lands on a done summary; deep-links jump panes.
 //
 
 import SwiftUI
 import AppKit
 
 struct TuneUpView: View {
-    private struct Row: Identifiable {
-        let id = UUID()
-        let rec: TuneUp.Recommendation
-        let path: String?   // freeCache rows carry the dir to trash
-    }
+    @StateObject private var model = TuneUpModel()
+    @StateObject private var flow = OperationFlow<TaskRunReport>()
+    var isActive: Bool = true
 
-    @State private var rows: [Row] = []
-    @State private var scanning = true
+    private enum Phase { case review, running, done }
+    private enum SafeStep { case clean, optimize }
+
+    @State private var phase: Phase = .review
+    @State private var includeClean = true
+    @State private var includeOptimize = true
+    @State private var runSteps: [SafeStep] = []
+    @State private var runIndex = 0
+    @State private var stepSummaries: [String] = []
+    @State private var showPlan = false
+
+    private var accent: Color { Tool.tuneup.accent }
 
     var body: some View {
-        let safeRows = rows.filter { $0.rec.safe }
-        let reviewRows = rows.filter { !$0.rec.safe }
+        Group {
+            switch phase {
+            case .review:            dashboard
+            case .running, .done:    runView
+            }
+        }
+        .onAppear { if isActive { model.scanIfNeeded() } }
+        .onChange(of: isActive) { _, now in if now { model.scanIfNeeded() } }
+        .onChange(of: flowToken) { _, _ in handleFlowChange() }
+        .sheet(isPresented: $showPlan) { planSheet }
+    }
+
+    // MARK: - Dashboard (review)
+
+    private var dashboard: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(NSLocalizedString("Tune-Up", comment: "")).font(.title2.bold())
-                if scanning { ProgressView().controlSize(.small) }
-
-                if !safeRows.isEmpty {
-                    HStack {
-                        Text(NSLocalizedString("Safe to run", comment: "")).font(.headline)
-                        Spacer()
-                        Text(Fmt.bytes(TuneUp.reclaimable(safeRows.map(\.rec))))
-                            .font(.body.monospacedDigit()).foregroundStyle(.secondary)
-                    }
-                    ForEach(safeRows) { row($0) }
-                    Button(NSLocalizedString("Run safe set", comment: "")) { runSafe(safeRows) }
-                        .buttonStyle(.borderedProminent).padding(.top, 4)
-                }
-
-                if !reviewRows.isEmpty {
-                    Text(NSLocalizedString("Needs review", comment: "")).font(.headline).padding(.top, 10)
-                    ForEach(reviewRows) { row($0) }
-                }
-
-                if !scanning, rows.isEmpty {
-                    Text(NSLocalizedString("Nothing to tune up — you're clean.", comment: ""))
-                        .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 14) {
+                header
+                if let snap = model.snapshot {
+                    safeSetCard(snap)
+                    if !snap.bigApps.isEmpty { uninstallCard(snap.bigApps) }
+                    updatesCard
+                    startupCard(snap)
+                    if !snap.bigDisk.isEmpty { diskCard(snap.bigDisk) }
+                    if let at = snap.lastRunAt { lastRunCard(at, snap.lastRunSummary) }
+                    if !snap.hasFindings, !model.scanning { tidyNote }
+                } else if model.scanning {
+                    scanningPlaceholder
+                } else {
+                    scanningPlaceholder
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .task { await gather() }
+        .scrollIndicators(.hidden)
     }
 
-    @ViewBuilder private func row(_ r: Row) -> some View {
-        HStack {
-            Text(r.rec.title)
-            Spacer()
-            if r.rec.bytes > 0 {
-                Text(Fmt.bytes(r.rec.bytes)).font(.body.monospacedDigit()).foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private func gather() async {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let found = await Task.detached(priority: .utility) { () -> [Row] in
-            var out: [Row] = []
-            for eco in DevHygiene.catalog(home: home) {
-                for path in eco.paths where FileManager.default.fileExists(atPath: path) {
-                    let bytes = DevHygiene.directorySize(path)
-                    if bytes > 200_000_000 {  // only surface caches worth clearing
-                        out.append(Row(rec: .init(
-                            kind: .freeCache,
-                            title: String(format: NSLocalizedString("Clear %@ cache", comment: ""), eco.name),
-                            bytes: bytes), path: path))
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(NSLocalizedString("Tune-Up", comment: ""))
+                    .font(Brand.serif(26, .medium)).foregroundStyle(Brand.textPrimary)
+                HStack(spacing: 7) {
+                    if model.scanning {
+                        ProgressView().controlSize(.small).tint(accent)
+                        Text(model.progress.isEmpty ? NSLocalizedString("Scanning…", comment: "") : model.progress)
+                            .font(Brand.mono(11)).foregroundStyle(Brand.textSecondary)
+                    } else {
+                        Text(scannedAgoText).font(Brand.mono(11)).foregroundStyle(Brand.textSecondary)
                     }
                 }
             }
-            for item in StartupInventory.scanLive() where item.controllable {
-                out.append(Row(rec: .init(
-                    kind: .disableStartupItem,
-                    title: String(format: NSLocalizedString("Review startup item: %@", comment: ""), item.label),
-                    bytes: 0), path: nil))
+            Spacer()
+            Button { model.rescan() } label: {
+                Label(NSLocalizedString("Re-scan", comment: ""), systemImage: "arrow.clockwise")
+                    .font(Brand.mono(11)).foregroundStyle(Brand.textSecondary)
             }
-            return out.sorted { $0.rec.bytes > $1.rec.bytes }
-        }.value
-        rows = found
-        scanning = false
+            .buttonStyle(.plain)
+            .disabled(model.scanning)
+            .opacity(model.scanning ? 0.4 : 1)
+        }
     }
 
-    private func runSafe(_ safeRows: [Row]) {
-        for r in safeRows {
-            if let p = r.path {
-                try? FileManager.default.trashItem(at: URL(fileURLWithPath: p), resultingItemURL: nil)
+    private var scannedAgoText: String {
+        guard let at = model.snapshot?.scannedAt else { return NSLocalizedString("Not scanned yet", comment: "") }
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .full
+        return String(format: NSLocalizedString("Scanned %@", comment: ""), f.localizedString(for: at, relativeTo: Date()))
+    }
+
+    private var scanningPlaceholder: some View {
+        VStack(spacing: 12) {
+            ProgressView().controlSize(.large).tint(accent)
+            Text(model.progress.isEmpty ? NSLocalizedString("Taking stock of the den…", comment: "") : model.progress)
+                .font(Brand.sans(13)).foregroundStyle(Brand.textSecondary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 280)
+    }
+
+    private var tidyNote: some View {
+        GlassCard {
+            HStack(spacing: 12) {
+                Image(systemName: "checkmark.seal.fill").font(.system(size: 20)).foregroundStyle(Brand.green)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(NSLocalizedString("Nothing pressing", comment: ""))
+                        .font(Brand.sans(14, .semibold)).foregroundStyle(Brand.textPrimary)
+                    Text(NSLocalizedString("No junk, stale apps, or new startup items worth a look right now.", comment: ""))
+                        .font(Brand.sans(12)).foregroundStyle(Brand.textSecondary)
+                }
+                Spacer()
             }
         }
-        Task { await gather() }
+    }
+
+    // MARK: Safe-set card
+
+    private func safeSetCard(_ snap: TuneUpSnapshot) -> some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Eyebrow(text: "One-tap tune-up", glyph: "wand.and.stars", color: accent)
+                Text(NSLocalizedString("Reclaim space and refresh maintenance in a single pass — everything here is reversible.", comment: ""))
+                    .font(Brand.sans(12.5)).foregroundStyle(Brand.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                planToggle(on: $includeClean, enabled: !snap.cleanableText.isEmpty,
+                           title: NSLocalizedString("Clean caches & junk", comment: ""),
+                           value: snap.cleanableText.isEmpty ? NSLocalizedString("nothing to clean", comment: "") : snap.cleanableText)
+                planToggle(on: $includeOptimize, enabled: !snap.optimizeAreas.isEmpty,
+                           title: NSLocalizedString("Run maintenance", comment: ""),
+                           value: snap.optimizeAreas.isEmpty
+                                ? NSLocalizedString("nothing to do", comment: "")
+                                : String(format: NSLocalizedString("%d areas", comment: ""), snap.optimizeAreas.count))
+
+                HStack(spacing: 12) {
+                    PillButton(title: "Run the safe set") { showPlan = true }
+                        .disabled(!canRun(snap))
+                        .opacity(canRun(snap) ? 1 : 0.4)
+                    Text(NSLocalizedString("Each step asks for your password.", comment: ""))
+                        .font(Brand.mono(10)).foregroundStyle(Brand.textTertiary)
+                    Spacer()
+                }
+                .padding(.top, 2)
+            }
+        }
+    }
+
+    private func planToggle(on: Binding<Bool>, enabled: Bool, title: String, value: String) -> some View {
+        HStack(spacing: 10) {
+            Toggle("", isOn: on).labelsHidden().toggleStyle(.switch).tint(accent)
+                .disabled(!enabled)
+            Text(title)
+                .font(Brand.sans(13, .medium))
+                .foregroundStyle(enabled ? Brand.textPrimary : Brand.textTertiary)
+            Spacer()
+            Text(value).font(Brand.mono(12)).foregroundStyle(enabled ? Brand.textSecondary : Brand.textTertiary)
+        }
+    }
+
+    private func canRun(_ snap: TuneUpSnapshot) -> Bool {
+        (includeClean && !snap.cleanableText.isEmpty) || (includeOptimize && !snap.optimizeAreas.isEmpty)
+    }
+
+    // MARK: Review cards
+
+    private func uninstallCard(_ apps: [TuneUpSnapshot.AppLite]) -> some View {
+        reviewCard(title: "Apps to review", glyph: "shippingbox",
+                   count: String(format: NSLocalizedString("%d large", comment: ""), apps.count),
+                   actionTitle: NSLocalizedString("Review in Software", comment: ""), pane: .tool(.apps)) {
+            VStack(spacing: 6) {
+                ForEach(apps.prefix(4)) { app in
+                    itemRow(name: app.name, value: Fmt.bytes(app.sizeBytes))
+                }
+            }
+        }
+    }
+
+    private var updatesCard: some View {
+        reviewCard(title: "App & Homebrew updates", glyph: "arrow.down.circle",
+                   count: "", actionTitle: NSLocalizedString("Check in Software", comment: ""), pane: .tool(.apps)) {
+            Text(NSLocalizedString("Check apps and Homebrew for newer versions. Burrow only reaches out to vendors when you ask it to here.", comment: ""))
+                .font(Brand.sans(12)).foregroundStyle(Brand.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func startupCard(_ snap: TuneUpSnapshot) -> some View {
+        let countText: String = snap.newStartup.isEmpty
+            ? String(format: NSLocalizedString("%d controllable", comment: ""), snap.startupControllable)
+            : String(format: NSLocalizedString("%d new", comment: ""), snap.newStartup.count)
+        return reviewCard(title: "Startup items", glyph: "power",
+                          count: countText,
+                          actionTitle: NSLocalizedString("Review in Software", comment: ""), pane: .tool(.apps)) {
+            if snap.newStartup.isEmpty {
+                Text(NSLocalizedString("No new login items since the last check.", comment: ""))
+                    .font(Brand.sans(12)).foregroundStyle(Brand.textSecondary)
+            } else {
+                VStack(spacing: 6) {
+                    ForEach(snap.newStartup.prefix(4), id: \.self) { label in
+                        itemRow(name: label, value: NSLocalizedString("new", comment: ""))
+                    }
+                }
+            }
+        }
+    }
+
+    private func diskCard(_ entries: [TuneUpSnapshot.DiskLite]) -> some View {
+        reviewCard(title: "Big disk users", glyph: "internaldrive",
+                   count: String(format: NSLocalizedString("top %d", comment: ""), entries.count),
+                   actionTitle: NSLocalizedString("Open in Analyze", comment: ""), pane: .tool(.analyze)) {
+            VStack(spacing: 6) {
+                ForEach(entries.prefix(4)) { e in
+                    itemRow(name: e.name, value: Fmt.bytes(e.size))
+                }
+            }
+        }
+    }
+
+    private func lastRunCard(_ at: Date, _ summary: String?) -> some View {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .full
+        return GlassCard {
+            HStack(spacing: 12) {
+                Image(systemName: "clock.arrow.circlepath").font(.system(size: 16)).foregroundStyle(accent)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(format: NSLocalizedString("Last tune-up %@", comment: ""),
+                                f.localizedString(for: at, relativeTo: Date())))
+                        .font(Brand.sans(13, .semibold)).foregroundStyle(Brand.textPrimary)
+                    if let s = summary, !s.isEmpty {
+                        Text(s).font(Brand.mono(11)).foregroundStyle(Brand.textSecondary)
+                    }
+                }
+                Spacer()
+            }
+        }
+    }
+
+    /// One review card: eyebrow + count, a custom detail, and a deep-link.
+    private func reviewCard<Detail: View>(
+        title: String, glyph: String, count: String, actionTitle: String, pane: Pane,
+        @ViewBuilder detail: () -> Detail
+    ) -> some View {
+        let content = detail()   // build eagerly so GlassCard's stored closure needn't escape `detail`
+        return GlassCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Eyebrow(text: title, glyph: glyph)
+                    Spacer()
+                    if !count.isEmpty {
+                        Text(count).font(Brand.mono(11)).foregroundStyle(Brand.textSecondary)
+                    }
+                }
+                content
+                Button { navigate(pane) } label: {
+                    HStack(spacing: 4) {
+                        Text(actionTitle).font(Brand.sans(12, .semibold))
+                        Image(systemName: "arrow.right").font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundStyle(accent)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func itemRow(name: String, value: String) -> some View {
+        HStack(spacing: 10) {
+            Text(name).font(Brand.sans(12)).foregroundStyle(Brand.textPrimary)
+                .lineLimit(1).truncationMode(.middle)
+            Spacer()
+            Text(value).font(Brand.mono(11)).foregroundStyle(Brand.textSecondary)
+        }
+    }
+
+    // MARK: - Run view
+
+    private var runView: some View {
+        VStack(spacing: 0) {
+            runStatusBar
+            Rectangle().fill(Brand.hairline).frame(height: 1)
+            if phase == .done {
+                DoneBanner(accent: accent,
+                           title: runFailed ? "Tune-up stopped" : "Tune-up complete",
+                           detail: stepSummaries.isEmpty ? nil : stepSummaries.joined(separator: " · "))
+            }
+            TaskReportView(groups: flow.report?.groups ?? [], accent: accent)
+            ViewLogDisclosure(log: flow.rawLog)
+        }
+    }
+
+    private var runStatusBar: some View {
+        HStack(spacing: 10) {
+            if phase == .running { ProgressView().controlSize(.small).tint(accent) }
+            Text(runStatusText).font(Brand.mono(12)).foregroundStyle(Brand.textSecondary)
+            Spacer()
+            if phase == .done {
+                Button { backToReview() } label: {
+                    Label(NSLocalizedString("Done", comment: ""), systemImage: "chevron.left")
+                        .font(Brand.mono(11)).foregroundStyle(Brand.textSecondary)
+                }.buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 18).padding(.top, 8).padding(.bottom, 12)
+    }
+
+    private var runStatusText: String {
+        switch phase {
+        case .running:
+            guard runIndex < runSteps.count else { return NSLocalizedString("Working…", comment: "") }
+            let pos = runIndex + 1, n = runSteps.count
+            switch runSteps[runIndex] {
+            case .clean:    return String(format: NSLocalizedString("Cleaning… (%d of %d)", comment: ""), pos, n)
+            case .optimize: return String(format: NSLocalizedString("Running maintenance… (%d of %d)", comment: ""), pos, n)
+            }
+        case .done:
+            if case .finished(.failed(let m)) = flow.state {
+                return String(format: NSLocalizedString("Stopped: %@", comment: ""), m)
+            }
+            return NSLocalizedString("Tune-up complete.", comment: "")
+        case .review:
+            return ""
+        }
+    }
+
+    private var runFailed: Bool {
+        if case .finished(.failed) = flow.state { return true }
+        if case .finished(.cancelled) = flow.state { return true }
+        return false
+    }
+
+    // MARK: - Run sequencing
+
+    private func runSafeSet() {
+        guard let snap = model.snapshot else { return }
+        var steps: [SafeStep] = []
+        if includeClean, !snap.cleanableText.isEmpty { steps.append(.clean) }
+        if includeOptimize, !snap.optimizeAreas.isEmpty { steps.append(.optimize) }
+        guard !steps.isEmpty else { return }
+        runSteps = steps
+        runIndex = 0
+        stepSummaries = []
+        phase = .running
+        startStep(steps[0])
+    }
+
+    private func startStep(_ step: SafeStep) {
+        switch step {
+        case .clean:
+            flow.start(.moleStream(["clean"], elevated: true,
+                                   label: NSLocalizedString("Tune-Up: cleaning", comment: ""),
+                                   notifyOnEnd: true))
+        case .optimize:
+            flow.start(.moleStream(["optimize"], elevated: true,
+                                   label: NSLocalizedString("Tune-Up: optimizing", comment: ""),
+                                   notifyOnEnd: true))
+        }
+    }
+
+    /// A stable token over the flow's lifecycle; includes runIndex so two
+    /// steps both finishing `.done(0)` still register as a change.
+    private var flowToken: String {
+        let s: String
+        switch flow.state {
+        case .idle:    s = "i"
+        case .gated:   s = "g"
+        case .running: s = "r"
+        case .finished(let o):
+            switch o {
+            case .done(let c):   s = "d\(c)"
+            case .failed(let m): s = "f\(m)"
+            case .cancelled:     s = "c"
+            }
+        }
+        return "\(runIndex):\(s)"
+    }
+
+    private func handleFlowChange() {
+        guard phase == .running else { return }
+        switch flow.state {
+        case .finished(.done):
+            if let line = flow.report?.summary?.completionLine, !line.isEmpty {
+                stepSummaries.append(line)
+            }
+            advance()
+        case .finished(.failed), .finished(.cancelled):
+            phase = .done
+            finalizeRun()
+        default:
+            break
+        }
+    }
+
+    private func advance() {
+        runIndex += 1
+        if runIndex < runSteps.count {
+            let next = runSteps[runIndex]
+            // Defer the next start out of the onChange dispatch.
+            Task { @MainActor in startStep(next) }
+        } else {
+            phase = .done
+            finalizeRun()
+        }
+    }
+
+    private func finalizeRun() {
+        let summary = stepSummaries.isEmpty
+            ? NSLocalizedString("No changes", comment: "")
+            : stepSummaries.joined(separator: " · ")
+        model.recordRun(summary: summary)
+    }
+
+    private func backToReview() {
+        flow.reset()
+        phase = .review
+        model.rescan()   // numbers are stale after a tune-up — refresh them
+    }
+
+    // MARK: - Plan sheet
+
+    private var planSheet: some View {
+        let snap = model.snapshot
+        let willClean = includeClean && !(snap?.cleanableText.isEmpty ?? true)
+        let willOptimize = includeOptimize && !(snap?.optimizeAreas.isEmpty ?? true)
+        return VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(NSLocalizedString("Tune-up plan", comment: ""))
+                    .font(Brand.serif(20, .medium)).foregroundStyle(Brand.textPrimary)
+                Text(NSLocalizedString("Burrow will run, in order:", comment: ""))
+                    .font(Brand.sans(12)).foregroundStyle(Brand.textSecondary)
+            }
+            VStack(spacing: 8) {
+                if willClean {
+                    planRow(glyph: "sparkles", title: NSLocalizedString("Clean caches & junk", comment: ""),
+                            value: snap?.cleanableText ?? "")
+                }
+                if willOptimize {
+                    planRow(glyph: "wand.and.stars", title: NSLocalizedString("Run maintenance", comment: ""),
+                            value: String(format: NSLocalizedString("%d areas", comment: ""), snap?.optimizeAreas.count ?? 0))
+                }
+            }
+            Text(NSLocalizedString("Files go to the Trash, not deleted. Each elevated step asks for your password separately.", comment: ""))
+                .font(Brand.mono(10)).foregroundStyle(Brand.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 12) {
+                Spacer()
+                Button(NSLocalizedString("Cancel", comment: "")) { showPlan = false }
+                    .buttonStyle(.plain).foregroundStyle(Brand.textSecondary)
+                PillButton(title: "Run") { showPlan = false; runSafeSet() }
+            }
+        }
+        .padding(24)
+        .frame(width: 420)
+        .background(Brand.nearBlack)
+        .environment(\.colorScheme, .dark)
+    }
+
+    private func planRow(glyph: String, title: String, value: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: glyph).font(.system(size: 13)).foregroundStyle(accent).frame(width: 18)
+            Text(title).font(Brand.sans(13, .medium)).foregroundStyle(Brand.textPrimary)
+            Spacer()
+            Text(value).font(Brand.mono(12)).foregroundStyle(Brand.textSecondary)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 9)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Brand.cardFill))
+    }
+
+    // MARK: - Navigation
+
+    private func navigate(_ pane: Pane) {
+        NotificationCenter.default.post(name: .burrowSelectPane, object: pane)
     }
 }

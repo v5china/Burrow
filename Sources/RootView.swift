@@ -138,7 +138,7 @@ struct RootView: View {
             CleanHub().tabVisible(pane == .tool(.clean))
             OptimizeView().tabVisible(pane == .tool(.optimize))
             PortsView().tabVisible(pane == .tool(.ports))
-            TuneUpView().tabVisible(pane == .tool(.tuneup))
+            TuneUpView(isActive: pane == .tool(.tuneup)).tabVisible(pane == .tool(.tuneup))
 
             // Gated on window visibility too: these two carry live timers
             // (2 s polls, 15 s DB reads) that must stop when the window

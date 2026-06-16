@@ -387,6 +387,15 @@ enum Store {
         set { write(newValue, "startup_baseline_json") }
     }
 
+    /// The Tune-Up pane's last scan + last run, as a JSON `TuneUpSnapshot`.
+    /// Persisted so the pane shows instantly on entry and survives relaunch
+    /// (#77's "persisted status across pane switches AND relaunch"). Not
+    /// user-facing — the pane owns the encode/decode.
+    static var tuneUpStateJSON: String {
+        get { d.string(forKey: "tune_up_state_json") ?? "" }
+        set { write(newValue, "tune_up_state_json") }
+    }
+
     /// Threshold alerts (CPU pegged / memory pressure high). Off by default —
     /// a taste thing, like the smart reminders.
     static var thresholdAlertsEnabled: Bool {
