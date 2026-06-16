@@ -156,7 +156,7 @@ final class BurrowNotifier: NSObject {
             return
         }
         postReminder(title: title, body: body, pane: nil, id: "burrow-threshold-\(ruleID)")
-        EventHub.shared.broadcast(SSE.event("threshold", data: "{\"rule\":\"\(ruleID)\",\"value\":\(value)}"))
+        EventHub.shared.broadcast(SSEFrame.event("threshold", data: "{\"rule\":\"\(ruleID)\",\"value\":\(value)}"))
     }
 
     // MARK: Smart reminders
@@ -202,7 +202,7 @@ final class BurrowNotifier: NSObject {
                         body: String(format: NSLocalizedString("“%@” now launches automatically. If you didn't add it, review it.", comment: ""), item.label),
                         pane: "apps", id: "burrow-startup-\(item.id)")
                     let safeID = item.id.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-                    EventHub.shared.broadcast(SSE.event("startup_item", data: "{\"id\":\"\(safeID)\"}"))
+                    EventHub.shared.broadcast(SSEFrame.event("startup_item", data: "{\"id\":\"\(safeID)\"}"))
                 }
             }
         }

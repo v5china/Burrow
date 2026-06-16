@@ -56,7 +56,7 @@ final class EventHub {
         DispatchQueue.main.async { [weak self] in
             guard let self, self.keepAlive == nil else { return }
             let t = Timer(timeInterval: 15, repeats: true) { _ in
-                EventHub.shared.broadcast(SSE.comment("keep-alive"))
+                EventHub.shared.broadcast(SSEFrame.comment("keep-alive"))
             }
             RunLoop.main.add(t, forMode: .common)
             self.keepAlive = t

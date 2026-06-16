@@ -208,7 +208,7 @@ final class QueryServer {
         let head = "HTTP/1.1 200 OK\r\n"
             + "Content-Type: text/event-stream; charset=utf-8\r\n"
             + "Cache-Control: no-store\r\nConnection: keep-alive\r\n\r\n"
-        conn.send(content: Data((head + SSE.comment("connected")).utf8), completion: .contentProcessed { _ in })
+        conn.send(content: Data((head + SSEFrame.comment("connected")).utf8), completion: .contentProcessed { _ in })
         EventHub.shared.register(conn)
         return true
     }
