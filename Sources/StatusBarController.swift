@@ -43,9 +43,9 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         // the @objc selector dispatch.
         let popover = NSPopover()
         popover.behavior = .transient
-        // Dark to match the app's glass aesthetic (affects the popover
-        // chrome + arrow; the HUD content paints its own dark surface).
-        popover.appearance = NSAppearance(named: .darkAqua)
+        // Follow the system appearance so the HUD adapts (light + dark); the
+        // content paints its own adaptive surface either way.
+        popover.appearance = nil
         // Initial size hint for the first measurement pass; HUDController
         // then drives the real (screen-capped) size via preferredContentSize.
         popover.contentSize = NSSize(width: 334, height: 560)

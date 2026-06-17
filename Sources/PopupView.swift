@@ -52,7 +52,6 @@ struct PopupView: View {
         .padding(13)
         .frame(width: 334)
         .fixedSize(horizontal: false, vertical: true)
-        .environment(\.colorScheme, .dark)
         // Three task-scoped subscriptions replace the old 1 s + 20 s timer
         // pair (issue #53): the snapshot and sparkline pumps are shared with
         // the Status pane, and closing the popover cancels these tasks,

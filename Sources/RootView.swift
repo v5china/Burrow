@@ -69,6 +69,9 @@ struct RootView: View {
             // One stable charcoal ground on every pane — switching tools no
             // longer re-tints the whole window in that tool's colour.
             Brand.windowVeil.ignoresSafeArea()
+            // A single soft warm glow in the corner — the house "gradient",
+            // kept ambient rather than a per-tool window wash.
+            Brand.ambientGlow.ignoresSafeArea()
 
             ZStack(alignment: .topLeading) {
                 // Content sits under the floating rail, inset on the left to
@@ -93,7 +96,7 @@ struct RootView: View {
                 // and drawn over the content.
                 FloatingRail(selected: $pane)
                     .padding(.leading, 14)
-                    .padding(.top, 40)
+                    .padding(.top, 12)
                     .padding(.bottom, 14)
             }
         }

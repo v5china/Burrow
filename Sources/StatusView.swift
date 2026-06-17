@@ -30,15 +30,15 @@ struct StatusView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 13) {
+            VStack(spacing: 14) {
                 if let s = model.snap {
-                    HStack(spacing: 13) {
+                    HStack(spacing: 14) {
                         HealthCard(s: s, minHeight: row1H)
                         cpuTile(s).frame(minHeight: row1H)
                         memTile(s).frame(minHeight: row1H)
                         gpuTile(s).frame(minHeight: row1H)
                     }
-                    HStack(spacing: 13) {
+                    HStack(spacing: 14) {
                         DiskCard(s: s, liveRead: io.readMBs, liveWrite: io.writeMBs, minHeight: row2H)
                         netTile(s).frame(minHeight: row2H)
                         fanTile(s).frame(minHeight: row2H)
@@ -51,9 +51,9 @@ struct StatusView: View {
                     waiting
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 4)
-            .padding(.bottom, 22)
+            .padding(.horizontal, 22)
+            .padding(.top, 10)
+            .padding(.bottom, 26)
         }
         .scrollIndicators(.hidden)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -523,6 +523,7 @@ struct ProcessCard: View {
                             }
                         }
                     }
+                    .overlayScrollers()
                 }
                 .scrollIndicators(.automatic)
                 .frame(height: 195)

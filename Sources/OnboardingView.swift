@@ -33,9 +33,8 @@ struct OnboardingView: View {
     var body: some View {
         ZStack {
             VisualEffectBackground().ignoresSafeArea()
-            LinearGradient(colors: [Color(hex: 0x16150F).opacity(0.90), Brand.nearBlack.opacity(0.97)],
-                           startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
+            Brand.windowVeil.ignoresSafeArea()
+            Brand.ambientGlow.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 progressDashes.padding(.top, 26)
@@ -43,7 +42,6 @@ struct OnboardingView: View {
             }
         }
         .frame(minWidth: 640, minHeight: 520)
-        .environment(\.colorScheme, .dark)
     }
 
     // MARK: - Progress dashes

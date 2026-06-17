@@ -11,8 +11,8 @@
 import SwiftUI
 
 struct GlassCard<Content: View>: View {
-    var padding: CGFloat = 14
-    var corner: CGFloat = 16
+    var padding: CGFloat = 16
+    var corner: CGFloat = 18
     var minHeight: CGFloat? = nil
     @ViewBuilder var content: () -> Content
 
@@ -28,6 +28,9 @@ struct GlassCard<Content: View>: View {
                 RoundedRectangle(cornerRadius: corner, style: .continuous)
                     .strokeBorder(Brand.hairline, lineWidth: 1)
             )
+            // A whisper of elevation — invisible on the dark coffee ground,
+            // just enough to lift cards off the paper in light mode.
+            .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 1)
     }
 }
 

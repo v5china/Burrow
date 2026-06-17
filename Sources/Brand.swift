@@ -2,14 +2,15 @@
 //  Brand.swift
 //  Burrow
 //
-//  Burrow's visual language — a cool graphite ground, crisp ink, and a
-//  single electric-blue accent for primary emphasis. Each tool still keeps
-//  its own vivid accent (teal / violet / coral / azure / gold) for active
-//  states, so the app reads as one calm surface with bright, purposeful
-//  pops — not a window that re-tints itself per tool.
+//  Burrow's visual language — a warm coffee ground (not grey), crisp warm
+//  ink, and a single electric-blue accent for primary emphasis. Each tool
+//  still keeps its own vivid accent (teal / violet / coral / azure / gold)
+//  for active states, so the app reads as one warm, calm surface with
+//  bright, purposeful pops — not a window that re-tints itself per tool.
 //
-//  Every surface/text token is appearance-adaptive (dark + light), so the
-//  whole shell follows the system theme. Type is the bundled brand set:
+//  Every surface/text token is appearance-adaptive (warm-dark + warm-light)
+//  so the whole shell follows the system theme. Type is the bundled brand
+//  set:
 //    * mono / rounded / sans  — Geist + Geist Mono (registered in Fonts.swift)
 //    * display / serif        — Cal Sans, the one expressive voice
 //
@@ -44,23 +45,23 @@ extension Color {
 }
 
 enum Brand {
-    // MARK: Ground — cool graphite (dark) / cool paper (light)
-    static let base      = Color.adaptive(0x0E0F13, 0xF4F5F7)
-    static let baseSoft  = Color.adaptive(0x15171C, 0xFFFFFF)
-    static let nearBlack = Color.adaptive(0x0A0B0D, 0xE6E8EC)
+    // MARK: Ground — warm coffee (dark) / warm paper (light)
+    static let base      = Color.adaptive(0x17120A, 0xF4EFE6)
+    static let baseSoft  = Color.adaptive(0x211A11, 0xFCF9F3)
+    static let nearBlack = Color.adaptive(0x0F0B05, 0xE8E1D4)
 
-    // MARK: Text — crisp off-white (dark) / near-black (light)
-    static let ink           = Color.adaptive(0xE9EAEE, 0x14161B)
-    static let textPrimary   = Color.adaptive(0xE9EAEE, 0x14161B)
-    static let textSecondary = Color.adaptive(0xE9EAEE, 0x14161B, darkA: 0.62, lightA: 0.60)
-    static let textTertiary  = Color.adaptive(0xE9EAEE, 0x14161B, darkA: 0.40, lightA: 0.42)
+    // MARK: Text — warm off-white (dark) / warm espresso (light)
+    static let ink           = Color.adaptive(0xEDE6DA, 0x221B11)
+    static let textPrimary   = Color.adaptive(0xEDE6DA, 0x221B11)
+    static let textSecondary = Color.adaptive(0xEDE6DA, 0x221B11, darkA: 0.62, lightA: 0.62)
+    static let textTertiary  = Color.adaptive(0xEDE6DA, 0x221B11, darkA: 0.40, lightA: 0.46)
 
-    // MARK: Surfaces — white lift (dark) / white lift over paper (light)
-    static let hairline      = Color.adaptive(0xFFFFFF, 0x000000, darkA: 0.09, lightA: 0.12)
-    static let cardFill      = Color.adaptive(0xFFFFFF, 0xFFFFFF, darkA: 0.045, lightA: 0.55)
-    static let cardFillHover = Color.adaptive(0xFFFFFF, 0xFFFFFF, darkA: 0.08, lightA: 0.80)
-    static let chipFill      = Color.adaptive(0xFFFFFF, 0x000000, darkA: 0.08, lightA: 0.06)
-    static let trackFill     = Color.adaptive(0xFFFFFF, 0x000000, darkA: 0.10, lightA: 0.08)
+    // MARK: Surfaces — warm-white lift (dark) / warm cards over paper (light)
+    static let hairline      = Color.adaptive(0xF2ECE0, 0x2A2114, darkA: 0.10, lightA: 0.12)
+    static let cardFill      = Color.adaptive(0xF2ECE0, 0xFFFFFF, darkA: 0.05, lightA: 0.62)
+    static let cardFillHover = Color.adaptive(0xF2ECE0, 0xFFFFFF, darkA: 0.085, lightA: 0.88)
+    static let chipFill      = Color.adaptive(0xF2ECE0, 0x2A2114, darkA: 0.08, lightA: 0.07)
+    static let trackFill     = Color.adaptive(0xF2ECE0, 0x2A2114, darkA: 0.10, lightA: 0.10)
 
     // MARK: Accent — one electric blue for primary emphasis (both modes)
     static let accent   = Color(hex: 0x5B8DEF)
@@ -90,13 +91,22 @@ enum Brand {
     static let rCard:  CGFloat = 18
     static let rLarge: CGFloat = 26
 
-    /// A stable veil drawn over the window vibrancy — identical on every pane
-    /// (no per-tool re-tint), adaptive to the system theme.
+    /// A stable warm veil drawn over the window vibrancy — identical on every
+    /// pane (no per-tool re-tint), adaptive to the system theme.
     static var windowVeil: LinearGradient {
         LinearGradient(
-            colors: [Color.adaptive(0x15171C, 0xFBFBFD, darkA: 0.55, lightA: 0.45),
-                     Color.adaptive(0x0B0C10, 0xEFF1F4, darkA: 0.82, lightA: 0.62)],
+            colors: [Color.adaptive(0x211A11, 0xFCF9F3, darkA: 0.55, lightA: 0.50),
+                     Color.adaptive(0x100B05, 0xEFE8DC, darkA: 0.82, lightA: 0.64)],
             startPoint: .top, endPoint: .bottom)
+    }
+
+    /// A faint warm glow for the canvas — the house "gradient", kept ambient
+    /// (a single soft light in the top-trailing corner) rather than a per-tool
+    /// wash. Sits over the veil in RootView.
+    static var ambientGlow: RadialGradient {
+        RadialGradient(
+            colors: [Color(hex: 0xD9A066).opacity(0.07), .clear],
+            center: .topTrailing, startRadius: 0, endRadius: 560)
     }
 
     // MARK: Type — the bundled brand set (registered in Fonts.swift)
