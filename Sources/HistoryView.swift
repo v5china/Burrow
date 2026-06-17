@@ -202,6 +202,57 @@ private struct AxisStyle {
     }
 }
 
+// MARK: - Metric model (drives the hero chart + the selectable strip)
+
+/// How a metric draws: continuous metrics as lines, usage-style metrics
+/// (CPU / GPU / health) as bars.
+private enum ChartMarks { case line, bars }
+
+private struct HistoryMetric: Identifiable {
+    let id: String
+    let title: String
+    let color: Color
+    let marks: ChartMarks
+    let unit: (HistorySnapshot) -> String
+    let series: (HistorySnapshot) -> [(name: String, points: [ChartPoint], color: Color)]
+
+    /// Latest value of the primary series, for the strip tile.
+    func summary(_ s: HistorySnapshot) -> String {
+        guard let last = series(s).first?.points.last?.value else { return "—" }
+        return last >= 100 ? String(format: "%.0f", last) : String(format: "%.1f", last)
+    }
+    func primary(_ s: HistorySnapshot) -> [Double] { series(s).first?.points.map(\.value) ?? [] }
+
+    static let all: [HistoryMetric] = [
+        .init(id: "cpu", title: "CPU usage", color: Brand.green, marks: .bars,
+              unit: { _ in "%" }, series: { [("usage", $0.cpuUsage, Brand.green)] }),
+        .init(id: "load", title: "CPU load", color: Brand.orange, marks: .line,
+              unit: { _ in "1m avg" }, series: { [("load1", $0.cpuLoad1, Brand.orange)] }),
+        .init(id: "mem", title: "Memory", color: Brand.amber, marks: .line,
+              unit: { $0.memoryPressure.isEmpty ? "% used" : $0.memoryPressure },
+              series: { [("used", $0.memoryUsed, Brand.amber)] }),
+        .init(id: "gpu", title: "GPU usage", color: Brand.orange, marks: .bars,
+              unit: { _ in "%" }, series: { [("gpu", $0.gpuUsage, Brand.orange)] }),
+        .init(id: "disk", title: "Disk I/O", color: Brand.blue, marks: .line,
+              unit: { _ in "MB/s" },
+              series: { [("read", $0.diskRead, Brand.blue), ("write", $0.diskWrite, Color(hex: 0x6E8BEA))] }),
+        .init(id: "net", title: "Network", color: Brand.green, marks: .line,
+              unit: { _ in "MB/s" },
+              series: { [("rx ↓", $0.netRx, Brand.green), ("tx ↑", $0.netTx, Brand.blue)] }),
+        .init(id: "thermal", title: "Thermal", color: Brand.red, marks: .line,
+              unit: { _ in "°C" },
+              series: { [("cpu", $0.thermalCPU, Brand.red), ("gpu", $0.thermalGPU, Brand.orange),
+                         ("battery", $0.thermalBattery, Brand.gold)] }),
+        .init(id: "fan", title: "Fans", color: Color(hex: 0x6EC1E4), marks: .line,
+              unit: { $0.fanCount > 0 ? "RPM" : "not reported" },
+              series: { [("fan", $0.fanSpeed, Color(hex: 0x6EC1E4))] }),
+        .init(id: "battery", title: "Battery", color: Brand.green, marks: .line,
+              unit: { _ in "%" }, series: { [("charge", $0.batteryPercent, Brand.green)] }),
+        .init(id: "health", title: "Health score", color: Brand.gold, marks: .bars,
+              unit: { _ in "0–100" }, series: { [("health", $0.healthScore, Brand.gold)] }),
+    ]
+}
+
 // MARK: - View
 
 struct HistoryView: View {
@@ -219,32 +270,20 @@ struct HistoryView: View {
     /// The currently-subscribed board feed — held so the toolbar's manual
     /// refresh can poke it; lifecycle belongs to `.task(id: range)` below.
     @State private var board: Feed<HistorySnapshot>?
+    /// Which metric is promoted to the big hero chart.
+    @State private var selectedMetricID: String = "cpu"
+    private var selectedMetric: HistoryMetric {
+        HistoryMetric.all.first { $0.id == selectedMetricID } ?? HistoryMetric.all[0]
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             toolbar.padding(.horizontal, 18).padding(.top, 8).padding(.bottom, 12)
                 Rectangle().fill(Brand.hairline).frame(height: 1)
                 ScrollView {
-                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 16) {
-                        chartCard("CPU usage", "%", [("usage", snapshot.cpuUsage, Brand.green)], marks: .bars)
-                        chartCard("CPU load", "1m avg", [("load1", snapshot.cpuLoad1, Brand.orange)])
-                        chartCard("Memory", snapshot.memoryPressure.isEmpty ? "% used" : snapshot.memoryPressure,
-                                  [("used", snapshot.memoryUsed, Brand.amber)])
-                        chartCard("GPU usage", "%", [("gpu", snapshot.gpuUsage, Brand.orange)], marks: .bars)
-                        chartCard("Disk I/O", "MB/s", [("read", snapshot.diskRead, Brand.blue),
-                                                       ("write", snapshot.diskWrite, Color(hex: 0x6E8BEA))])
-                        // Download (rx) green ↓, upload (tx) blue ↑ — clearly
-                        // distinct hues (the old rx/tx greens read as one line),
-                        // matching the Status net tile.
-                        chartCard("Network", "MB/s", [("rx ↓", snapshot.netRx, Brand.green),
-                                                      ("tx ↑", snapshot.netTx, Brand.blue)])
-                        chartCard("Thermal", "°C", [("cpu", snapshot.thermalCPU, Brand.red),
-                                                    ("gpu", snapshot.thermalGPU, Brand.orange),
-                                                    ("battery", snapshot.thermalBattery, Brand.gold)])
-                        chartCard("Fans", snapshot.fanCount > 0 ? "RPM" : "not reported",
-                                  [("fan", snapshot.fanSpeed, Color(hex: 0x6EC1E4))])
-                        chartCard("Battery", "%", [("charge", snapshot.batteryPercent, Brand.green)])
-                        chartCard("Health score", "0–100", [("health", snapshot.healthScore, Brand.gold)], marks: .bars)
+                    VStack(spacing: 16) {
+                        heroCard
+                        metricStrip
                         topProcessesCard
                     }
                     .padding(20)
@@ -324,9 +363,7 @@ struct HistoryView: View {
         .overlay(Capsule().strokeBorder(Brand.hairline, lineWidth: 1))
     }
 
-    /// How a chart card draws its series: continuous metrics stay lines,
-    /// discrete usage-style metrics (CPU / GPU / health) read as bars.
-    private enum ChartMarks { case line, bars }
+    // ChartMarks now lives at file scope (drives the metric model above).
 
     /// Evenly spaced sample indices to label on a by-index bar axis — maps
     /// back to real timestamps for the labels without distorting the bars.
@@ -348,25 +385,89 @@ struct HistoryView: View {
         return (0..<cap).map { pts[Int((Double($0) * step).rounded())] }
     }
 
-    private func chartCard(_ title: String, _ subtitle: String,
-                           _ series: [(name: String, points: [ChartPoint], color: Color)],
-                           marks: ChartMarks = .line) -> some View {
+    // MARK: - Hero chart + selectable metric strip
+
+    private var heroCard: some View {
+        let m = selectedMetric
+        let series = m.series(snapshot)
+        return GlassCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(NSLocalizedString(m.title, comment: "").uppercased())
+                        .font(Brand.mono(11, .bold)).tracking(1.0).foregroundStyle(m.color)
+                    Text(NSLocalizedString(m.unit(snapshot), comment: ""))
+                        .font(Brand.mono(10)).foregroundStyle(Brand.textTertiary)
+                    Spacer()
+                    if series.count > 1 { legend(series) }
+                }
+                chartBody(series, marks: m.marks, height: 240)
+            }
+        }
+    }
+
+    private func legend(_ series: [(name: String, points: [ChartPoint], color: Color)]) -> some View {
+        HStack(spacing: 12) {
+            ForEach(series, id: \.name) { s in
+                HStack(spacing: 4) {
+                    Circle().fill(s.color).frame(width: 6, height: 6)
+                    Text(s.name).font(Brand.mono(9)).foregroundStyle(Brand.textTertiary)
+                }
+            }
+        }
+    }
+
+    private var metricStrip: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12) {
+            ForEach(HistoryMetric.all) { m in stripTile(m) }
+        }
+    }
+
+    private func stripTile(_ m: HistoryMetric) -> some View {
+        let on = m.id == selectedMetricID
+        return Button { withAnimation(.easeOut(duration: 0.16)) { selectedMetricID = m.id } } label: {
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(spacing: 5) {
+                    Circle().fill(m.color).frame(width: 6, height: 6)
+                    Text(NSLocalizedString(m.title, comment: "").uppercased())
+                        .font(Brand.mono(9, .bold)).tracking(0.6)
+                        .foregroundStyle(on ? Brand.textPrimary : Brand.textSecondary).lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    Text(m.summary(snapshot)).font(Brand.mono(17, .semibold)).foregroundStyle(Brand.textPrimary)
+                    Text(NSLocalizedString(m.unit(snapshot), comment: "")).font(Brand.mono(8))
+                        .foregroundStyle(Brand.textTertiary).lineLimit(1)
+                }
+                MiniChart(values: m.primary(snapshot), color: m.color, style: m.marks == .bars ? .bars : .area)
+                    .frame(height: 22)
+            }
+            .padding(11)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(on ? Brand.cardFillHover : Brand.cardFill))
+            .overlay {
+                if on {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(m.color.opacity(0.55), lineWidth: 1.5)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func chartBody(_ series: [(name: String, points: [ChartPoint], color: Color)],
+                           marks: ChartMarks, height: CGFloat) -> some View {
         let allEmpty = series.allSatisfy { $0.points.isEmpty }
         let style = AxisStyle.forRangeMinutes(range.minutes)
         let window = Double(range.minutes * 60)
         let strideSec = max(1.0, window / 720.0)
         let gapThreshold = max(Double(Store.sampleIntervalSeconds), strideSec) * 3.5
-        return GlassCard {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(NSLocalizedString(title, comment: "").uppercased()).font(Brand.mono(10, .bold)).tracking(1.0).foregroundStyle(series.first?.color ?? Brand.textSecondary)
-                    Text(NSLocalizedString(subtitle, comment: "")).font(Brand.mono(9)).foregroundStyle(Brand.textTertiary)
-                }
-                if allEmpty {
-                    Text("No samples in this window")
-                        .font(Brand.mono(11)).foregroundStyle(Brand.textTertiary)
-                        .frame(maxWidth: .infinity, minHeight: 170)
-                } else if marks == .bars {
+        if allEmpty {
+            Text("No samples in this window")
+                .font(Brand.mono(11)).foregroundStyle(Brand.textTertiary)
+                .frame(maxWidth: .infinity, minHeight: height)
+        } else if marks == .bars {
                     // Bars are plotted BY INDEX (like the Status sparklines):
                     // each sample gets an equal slot, so width and gaps are
                     // uniform at every range. Axis labels map a few indices
@@ -418,7 +519,7 @@ struct HistoryView: View {
                             AxisValueLabel().foregroundStyle(Brand.textTertiary).font(Brand.mono(8))
                         }
                     }
-                    .frame(height: 170)
+                    .frame(height: height)
                 } else {
                     Chart {
                         ForEach(series, id: \.name) { s in
@@ -444,10 +545,8 @@ struct HistoryView: View {
                             AxisValueLabel().foregroundStyle(Brand.textTertiary).font(Brand.mono(8))
                         }
                     }
-                    .frame(height: 170)
+                    .frame(height: height)
                 }
-            }
-        }
     }
 
     /// Processes ranked by the selected metric (CPU or RAM), peak across the
