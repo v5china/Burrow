@@ -150,3 +150,28 @@ Doctor, Activity streaming, 18 `burrow_*` MCP tools, metrics history/snapshots.
 4. **P3** as capacity allows.
 
 Issues: file grouped by track (P0 individually; P1/P2/P3 one epic each) — **after Henry reviews this plan.**
+
+---
+
+## Status — implemented this run (branch feat/ui-backlog-2026-06-16, no push)
+
+Compile-verified only (sandbox can't run the test suite; runs on CI). All committed, no GH issues filed, no push.
+
+- ✅ **P0.1 chart drag** — WindowDragBlocker NSView (fc81700)
+- ✅ **P0.2 alert thresholds** — configurable CPU/mem + Settings steppers + tests (fc81700)
+- ✅ **P0.3 purge git badge** — home-relative label → real path (fc81700)
+- ✅ **P1.1 Tune-Up** — Smart-Care flow: Scan → scanning → results → run (6c39082)
+- ✅ **P1.2 Dev Hygiene** — multi-select bulk reclaim (62ef0e0); **Report** restyled to cards (prior)
+- ✅ **P2.1 Ports suite** — established conns + remote + service labels + conflicts + filter + tests (755f130)
+- ✅ **P2.2 Connectivity / Get Online** — captive probe + VPN/proxy/DNS + deep-links + tests (358aaaa)
+- ✅ **P2.4 Notifications** — backup-overdue + SMART-failing reminders + tests (c3845e7)
+- ✅ **P2.5 prescan** — basic per-pane warm shipped; shared cache deferred
+- ✅ **P3 Brewfile snapshots** — export/restore in Settings (6aca8ae)
+- ✅ **P3 brew services** — Software ▸ Services segment + tests (e9230ff)
+
+### Deferred (honest reasons — NOT done)
+- **P2.3 Vulnerability scanning** — needs the external `brew vulns` tap (not installed) AND parsing a JSON format I haven't seen; won't ship a guessed parser. Real follow-up: detect tap → one-click install → validate `brew vulns --json` shape against real output.
+- **P3 App security insights** (codesign/notarization) — SecStaticCode interop + per-app-detail surgery; untestable here, deferred to avoid blind interop bugs.
+- **P3 GitHub-releases update source / trending / `--adopt`** — lower value / network / niche.
+- **system-busy badge** — needs a signal inside the `mo` engine (separate repo).
+- **SMART wear%/temp** — private IONVMeSMARTUserClient + real hardware.
