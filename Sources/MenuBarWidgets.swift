@@ -100,6 +100,10 @@ enum MenuBarMetric: String, Codable, CaseIterable, Identifiable {
         case .battery:                return [.value, .labeled, .bar, .battery]
         }
     }
+
+    /// The metrics offered as tiles in the popover grid (issue #82 popup
+    /// customization), in display order.
+    static let popupGrid: [MenuBarMetric] = [.cpu, .gpu, .memory, .diskUsage, .network, .fan]
 }
 
 /// How a metric is rendered in the bar.
@@ -125,12 +129,15 @@ enum MenuBarWidgetStyle: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-/// How the value is coloured.
+/// How the value is coloured. The first four are value-driven; the rest are
+/// fixed named colours from the Brand palette (à la a desktop monitor's
+/// per-widget colour picker).
 enum MenuBarColorMode: String, Codable, CaseIterable, Identifiable {
     case utilization  // green→gold→orange→red by load
     case accent       // Burrow blue
     case mono         // adapts to the menu bar (label colour)
     case pressure     // memory-pressure tinting
+    case blue, green, orange, gold, amber, red
 
     var id: String { rawValue }
 
@@ -140,16 +147,99 @@ enum MenuBarColorMode: String, Codable, CaseIterable, Identifiable {
         case .accent:      return NSLocalizedString("Accent", comment: "")
         case .mono:        return NSLocalizedString("Monochrome", comment: "")
         case .pressure:    return NSLocalizedString("By pressure", comment: "")
+        case .blue:        return NSLocalizedString("Blue", comment: "")
+        case .green:       return NSLocalizedString("Green", comment: "")
+        case .orange:      return NSLocalizedString("Orange", comment: "")
+        case .gold:        return NSLocalizedString("Gold", comment: "")
+        case .amber:       return NSLocalizedString("Amber", comment: "")
+        case .red:         return NSLocalizedString("Red", comment: "")
+        }
+    }
+
+    /// A fixed colour for the named modes; nil for the value-driven ones.
+    var fixedColor: NSColor? {
+        switch self {
+        case .blue:   return NSColor(Brand.blue)
+        case .green:  return NSColor(Brand.green)
+        case .orange: return NSColor(Brand.orange)
+        case .gold:   return NSColor(Brand.gold)
+        case .amber:  return NSColor(Brand.amber)
+        case .red:    return NSColor(Brand.red)
+        default:      return nil
         }
     }
 }
 
-/// One configured widget. `id` is stable across reorders/edits.
+/// The up/down indicator the `speed` style draws.
+enum SpeedPictogram: String, Codable, CaseIterable, Identifiable {
+    case arrows, dots, none
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .arrows: return NSLocalizedString("Arrows", comment: "")
+        case .dots:   return NSLocalizedString("Dots", comment: "")
+        case .none:   return NSLocalizedString("None", comment: "")
+        }
+    }
+    func symbol(up: Bool) -> String {
+        switch self {
+        case .arrows: return up ? "↑" : "↓"
+        case .dots:   return "•"
+        case .none:   return ""
+        }
+    }
+}
+
+/// One configured widget. `id` is stable across reorders/edits. The extra
+/// per-widget options (label/value/fill/history/pictogram/units) give the
+/// depth a desktop monitor's widget settings offer.
 struct MenuBarItem: Codable, Equatable, Identifiable {
     var id = UUID()
     var metric: MenuBarMetric
     var style: MenuBarWidgetStyle
     var color: MenuBarColorMode = .utilization
+    /// Prefix the metric's short label (e.g. "CPU") on the bar/sparkline/
+    /// speed/battery styles (the `.labeled` style already carries one).
+    var showLabel: Bool = false
+    /// Draw the trailing numeric on the bar/sparkline/speed/battery styles.
+    var showValue: Bool = true
+    /// Sparkline: filled area vs. a bare stroke.
+    var fill: Bool = true
+    /// Sparkline: how many recent points to plot (30/60/90/120).
+    var historyPoints: Int = 30
+    /// Speed: the up/down indicator.
+    var pictogram: SpeedPictogram = .arrows
+    /// Speed: append the unit suffix (M/K) to the rate.
+    var showUnits: Bool = true
+
+    init(metric: MenuBarMetric, style: MenuBarWidgetStyle, color: MenuBarColorMode = .utilization,
+         showLabel: Bool = false, showValue: Bool = true, fill: Bool = true,
+         historyPoints: Int = 30, pictogram: SpeedPictogram = .arrows, showUnits: Bool = true) {
+        self.metric = metric; self.style = style; self.color = color
+        self.showLabel = showLabel; self.showValue = showValue; self.fill = fill
+        self.historyPoints = historyPoints; self.pictogram = pictogram; self.showUnits = showUnits
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, metric, style, color, showLabel, showValue, fill, historyPoints, pictogram, showUnits
+    }
+
+    /// Tolerant decode: every field falls back to its default, so widget rows
+    /// persisted by an earlier version (which only stored id/metric/style/
+    /// colour) still load instead of dropping the user's whole row set.
+    init(from d: Decoder) throws {
+        let c = try d.container(keyedBy: CodingKeys.self)
+        id            = (try? c.decode(UUID.self, forKey: .id)) ?? UUID()
+        metric        = (try? c.decode(MenuBarMetric.self, forKey: .metric)) ?? .cpu
+        style         = (try? c.decode(MenuBarWidgetStyle.self, forKey: .style)) ?? .value
+        color         = (try? c.decode(MenuBarColorMode.self, forKey: .color)) ?? .utilization
+        showLabel     = (try? c.decode(Bool.self, forKey: .showLabel)) ?? false
+        showValue     = (try? c.decode(Bool.self, forKey: .showValue)) ?? true
+        fill          = (try? c.decode(Bool.self, forKey: .fill)) ?? true
+        historyPoints = (try? c.decode(Int.self, forKey: .historyPoints)) ?? 30
+        pictogram     = (try? c.decode(SpeedPictogram.self, forKey: .pictogram)) ?? .arrows
+        showUnits     = (try? c.decode(Bool.self, forKey: .showUnits)) ?? true
+    }
 
     /// Coerce the style to one the metric actually supports (config can drift
     /// if a metric's offerings change between versions).
@@ -242,6 +332,7 @@ enum MenuBarRenderer {
     }
 
     static func color(for item: MenuBarItem, value: Double, values: MenuBarMetricValues) -> NSColor {
+        if let fixed = item.color.fixedColor { return fixed }   // named colours
         switch item.color {
         case .mono:    return .labelColor
         case .accent:  return NSColor(Brand.blue)
@@ -249,17 +340,19 @@ enum MenuBarRenderer {
             if item.metric == .battery { return batteryColor(value, charging: values.batteryCharging) }
             if item.metric.isPercentage { return utilization(value) }
             return NSColor(Brand.blue)
+        default:       return .labelColor   // unreachable: named modes handled above
         }
     }
 
     // MARK: Formatting
 
-    /// Compact rate: MB/s → "12M" / "1.2M" / "640K" / "0".
-    static func rate(_ mbs: Double) -> String {
-        if mbs >= 10 { return String(format: "%.0fM", mbs) }
-        if mbs >= 1  { return String(format: "%.1fM", mbs) }
+    /// Compact rate: MB/s → "12M" / "1.2M" / "640K" / "0". `units:false` drops
+    /// the M/K suffix (Speed widget's "Units" toggle).
+    static func rate(_ mbs: Double, units: Bool = true) -> String {
+        if mbs >= 10 { return String(format: units ? "%.0fM" : "%.0f", mbs) }
+        if mbs >= 1  { return String(format: units ? "%.1fM" : "%.1f", mbs) }
         let kb = mbs * 1024
-        if kb >= 1 { return String(format: "%.0fK", kb) }
+        if kb >= 1 { return String(format: units ? "%.0fK" : "%.0f", kb) }
         return "0"
     }
 
@@ -303,34 +396,46 @@ private struct Cell {
 
     private static func width(item: MenuBarItem, style: MenuBarWidgetStyle, values: MenuBarMetricValues) -> CGFloat {
         let valueW = textW(MenuBarRenderer.valueText(item.metric, values), MenuBarRenderer.valueFontPublic)
+        // Optional leading label (on the non-text styles) + optional trailing value.
+        let labelPrefix = (item.showLabel && style != .value && style != .labeled)
+            ? textW(item.metric.label, MenuBarRenderer.labelFontPublic) + 4 : 0
+        let valueSuffix = item.showValue ? (5 + valueW) : 0
         switch style {
         case .value:
             return valueW
         case .labeled:
             return textW(item.metric.label, MenuBarRenderer.labelFontPublic) + 4 + valueW
         case .bar:
-            return MenuBarRenderer.barWPublic + 5 + valueW
+            return labelPrefix + MenuBarRenderer.barWPublic + valueSuffix
         case .sparkline:
-            return MenuBarRenderer.sparkWPublic + 5 + valueW
+            return labelPrefix + MenuBarRenderer.sparkWPublic + valueSuffix
         case .speed:
-            let rx = "↓" + MenuBarRenderer.rate(values.primary[item.metric] ?? 0)
-            let tx = "↑" + MenuBarRenderer.rate(values.secondary[item.metric] ?? 0)
-            return max(textW(rx, MenuBarRenderer.speedFontPublic), textW(tx, MenuBarRenderer.speedFontPublic))
+            let rx = item.pictogram.symbol(up: false) + MenuBarRenderer.rate(values.primary[item.metric] ?? 0, units: item.showUnits)
+            let tx = item.pictogram.symbol(up: true) + MenuBarRenderer.rate(values.secondary[item.metric] ?? 0, units: item.showUnits)
+            return labelPrefix + max(textW(rx, MenuBarRenderer.speedFontPublic), textW(tx, MenuBarRenderer.speedFontPublic))
         case .battery:
-            return MenuBarRenderer.batteryWPublic + 4 + valueW
+            return labelPrefix + MenuBarRenderer.batteryWPublic + valueSuffix
         }
     }
 
     // MARK: draw
 
     func draw(originX: CGFloat, height: CGFloat) {
+        var x = originX
+        // Optional leading label for the non-text styles (value/labeled draw
+        // their own label inline).
+        if item.showLabel, style != .value, style != .labeled {
+            let lf = MenuBarRenderer.labelFontPublic
+            drawString(item.metric.label, lf, .secondaryLabelColor, at: NSPoint(x: x, y: centeredY(lf, height)))
+            x += (item.metric.label as NSString).size(withAttributes: [.font: lf]).width + 4
+        }
         switch style {
-        case .value:     drawValue(originX, height)
-        case .labeled:   drawLabeled(originX, height)
-        case .bar:       drawBar(originX, height)
-        case .sparkline: drawSparkline(originX, height)
-        case .speed:     drawSpeed(originX, height)
-        case .battery:   drawBattery(originX, height)
+        case .value:     drawValue(x, height)
+        case .labeled:   drawLabeled(x, height)
+        case .bar:       drawBar(x, height)
+        case .sparkline: drawSparkline(x, height)
+        case .speed:     drawSpeed(x, height)
+        case .battery:   drawBattery(x, height)
         }
     }
 
@@ -375,13 +480,15 @@ private struct Cell {
                                     xRadius: bh / 2, yRadius: bh / 2)
             valueColor.setFill(); fill.fill()
         }
-        let vf = MenuBarRenderer.valueFontPublic
-        drawString(MenuBarRenderer.valueText(item.metric, values), vf, valueColor,
-                   at: NSPoint(x: x + bw + 5, y: centeredY(vf, h)))
+        if item.showValue {
+            let vf = MenuBarRenderer.valueFontPublic
+            drawString(MenuBarRenderer.valueText(item.metric, values), vf, valueColor,
+                       at: NSPoint(x: x + bw + 5, y: centeredY(vf, h)))
+        }
     }
 
     private func drawSparkline(_ x: CGFloat, _ h: CGFloat) {
-        let series = values.histories[item.metric] ?? []
+        let series = Array((values.histories[item.metric] ?? []).suffix(item.historyPoints))
         let sw = MenuBarRenderer.sparkWPublic
         let inset: CGFloat = 4
         let chartH = h - inset * 2
@@ -396,12 +503,14 @@ private struct Cell {
             }
             let line = NSBezierPath(); line.move(to: pt(0))
             for i in 1..<series.count { line.line(to: pt(i)) }
-            // Filled area under the curve.
-            let area = line.copy() as! NSBezierPath
-            area.line(to: NSPoint(x: x + sw, y: inset))
-            area.line(to: NSPoint(x: x, y: inset))
-            area.close()
-            color.withAlphaComponent(0.18).setFill(); area.fill()
+            if item.fill {
+                // Filled area under the curve.
+                let area = line.copy() as! NSBezierPath
+                area.line(to: NSPoint(x: x + sw, y: inset))
+                area.line(to: NSPoint(x: x, y: inset))
+                area.close()
+                color.withAlphaComponent(0.18).setFill(); area.fill()
+            }
             color.setStroke(); line.lineWidth = 1; line.stroke()
         } else {
             // Flat baseline when there's no history yet.
@@ -409,23 +518,25 @@ private struct Cell {
             base.move(to: NSPoint(x: x, y: h / 2)); base.line(to: NSPoint(x: x + sw, y: h / 2))
             color.withAlphaComponent(0.4).setStroke(); base.lineWidth = 1; base.stroke()
         }
-        let vf = MenuBarRenderer.valueFontPublic
-        drawString(MenuBarRenderer.valueText(item.metric, values), vf, color,
-                   at: NSPoint(x: x + sw + 5, y: centeredY(vf, h)))
+        if item.showValue {
+            let vf = MenuBarRenderer.valueFontPublic
+            drawString(MenuBarRenderer.valueText(item.metric, values), vf, color,
+                       at: NSPoint(x: x + sw + 5, y: centeredY(vf, h)))
+        }
     }
 
     private func drawSpeed(_ x: CGFloat, _ h: CGFloat) {
         let f = MenuBarRenderer.speedFontPublic
-        let down = "↓" + MenuBarRenderer.rate(values.primary[item.metric] ?? 0)
-        let up   = "↑" + MenuBarRenderer.rate(values.secondary[item.metric] ?? 0)
+        let down = item.pictogram.symbol(up: false) + MenuBarRenderer.rate(values.primary[item.metric] ?? 0, units: item.showUnits)
+        let up   = item.pictogram.symbol(up: true)  + MenuBarRenderer.rate(values.secondary[item.metric] ?? 0, units: item.showUnits)
         let lineH = f.ascender - f.descender
         let gap: CGFloat = 1
         let topY = h / 2 + gap / 2 - f.descender
         let botY = h / 2 - lineH - gap / 2 - f.descender
-        let c = item.color == .mono ? NSColor.labelColor : NSColor(Brand.blue)
-        drawString(down, f, c, at: NSPoint(x: x, y: topY))
-        drawString(up, f, item.color == .mono ? .secondaryLabelColor : NSColor(Brand.green),
-                   at: NSPoint(x: x, y: botY))
+        let cDown = item.color == .mono ? NSColor.labelColor : (item.color.fixedColor ?? NSColor(Brand.blue))
+        let cUp   = item.color == .mono ? NSColor.secondaryLabelColor : (item.color.fixedColor ?? NSColor(Brand.green))
+        drawString(down, f, cDown, at: NSPoint(x: x, y: topY))
+        drawString(up, f, cUp, at: NSPoint(x: x, y: botY))
     }
 
     private func drawBattery(_ x: CGFloat, _ h: CGFloat) {
@@ -447,9 +558,11 @@ private struct Cell {
             let fill = NSBezierPath(rect: NSRect(x: x + inset, y: by + inset, width: fillW, height: bh - inset * 2))
             color.setFill(); fill.fill()
         }
-        let vf = MenuBarRenderer.valueFontPublic
-        drawString(MenuBarRenderer.valueText(item.metric, values), vf, color,
-                   at: NSPoint(x: x + bw + 4, y: centeredY(vf, h)))
+        if item.showValue {
+            let vf = MenuBarRenderer.valueFontPublic
+            drawString(MenuBarRenderer.valueText(item.metric, values), vf, color,
+                       at: NSPoint(x: x + bw + 4, y: centeredY(vf, h)))
+        }
     }
 }
 
