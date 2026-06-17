@@ -32,8 +32,9 @@ struct StatusView: View {
         ScrollView {
             VStack(spacing: 16) {
                 if let s = model.snap {
+                    HealthHero(s: s)
+                    Rectangle().fill(Brand.hairline).frame(height: 1).padding(.bottom, 2)
                     HStack(spacing: 16) {
-                        HealthCard(s: s, minHeight: row1H)
                         cpuTile(s).frame(minHeight: row1H)
                         memTile(s).frame(minHeight: row1H)
                         gpuTile(s).frame(minHeight: row1H)
@@ -197,34 +198,31 @@ struct StatusView: View {
 
 // MARK: - Health
 
-struct HealthCard: View {
+/// The Overview hero — Health, pulled out of the card grid into an open,
+/// borderless band so the page reads as "focal summary + supporting metrics"
+/// rather than a uniform grid of boxes. Big Cal Sans score, the ring, and the
+/// machine spec / uptime on the right.
+struct HealthHero: View {
     let s: MoleStatus
-    var minHeight: CGFloat? = nil
 
     var body: some View {
-        GlassCard(minHeight: minHeight) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Eyebrow(text: "Health", glyph: "checkmark.seal.fill", color: Brand.gold)
-                    Spacer(minLength: 4)
-                    Text(specLine).font(Brand.mono(9)).foregroundStyle(Brand.textTertiary).lineLimit(1)
+        HStack(alignment: .center, spacing: 18) {
+            HealthRing(score: s.healthScore, color: ratingColor)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("\(s.healthScore)").font(Brand.display(44)).foregroundStyle(Brand.textPrimary)
+                    Text(rating).font(Brand.sans(14, .medium)).foregroundStyle(ratingColor)
                 }
-                HStack(alignment: .center, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            Text("\(s.healthScore)").font(Brand.mono(30, .semibold)).foregroundStyle(Brand.textPrimary)
-                            Text(rating).font(Brand.sans(12, .medium)).foregroundStyle(ratingColor)
-                        }
-                        Text(message).font(Brand.sans(11)).foregroundStyle(Brand.textSecondary)
-                            .lineLimit(2).fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer(minLength: 4)
-                    HealthRing(score: s.healthScore, color: ratingColor)
-                }
-                Spacer(minLength: 2)
+                Text(message).font(Brand.sans(12)).foregroundStyle(Brand.textSecondary).lineLimit(1)
+            }
+            Spacer(minLength: 12)
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(specLine).font(Brand.mono(10)).foregroundStyle(Brand.textTertiary).lineLimit(1)
                 Text(uptimeLine).font(Brand.mono(10)).foregroundStyle(Brand.textTertiary).lineLimit(1)
             }
         }
+        .padding(.horizontal, 6).padding(.vertical, 4)
+        .frame(maxWidth: .infinity)
     }
 
     private var specLine: String {
