@@ -7,8 +7,8 @@
 //  latest snapshot + live permission/engine checks. Same verdict logic as the
 //  burrow_doctor MCP tool.
 //
-//  NOTE (hand-test): compile-verified only. Verify the checks populate and the
-//  ok/warn/fail colours read correctly against a real machine.
+//  NOTE (hand-test): verify the checks populate and the ok/warn/fail colours
+//  read correctly against a real machine.
 //
 
 import SwiftUI
@@ -19,24 +19,55 @@ struct DoctorView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(NSLocalizedString("Diagnostics", comment: "")).font(.title2.bold())
-                ForEach(Array(checks.enumerated()), id: \.offset) { _, c in
-                    HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: glyph(c.level)).foregroundStyle(tint(c.level))
-                            .frame(width: 20)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(c.name).font(.headline)
-                            Text(c.detail).font(.caption).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 14) {
+                Text(NSLocalizedString("Diagnostics", comment: ""))
+                    .font(Brand.serif(22, .medium)).foregroundStyle(Brand.textPrimary)
+
+                if checks.isEmpty {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text(NSLocalizedString("Running checks…", comment: ""))
+                            .font(Brand.mono(11)).foregroundStyle(Brand.textSecondary)
+                    }
+                    .padding(.vertical, 8)
+                } else {
+                    // One borderless card; checks separated by hairlines rather
+                    // than boxed individually — matches the dashboard's read.
+                    GlassCard {
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(Array(checks.enumerated()), id: \.offset) { i, c in
+                                if i > 0 {
+                                    Rectangle().fill(Brand.hairline).frame(height: 1)
+                                }
+                                row(c)
+                            }
                         }
-                        Spacer()
                     }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(20)
         }
+        .scrollIndicators(.hidden)
+        .fadeEdges()
         .task { reload() }
+    }
+
+    private func row(_ c: Doctor.Check) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: glyph(c.level)).font(.system(size: 15))
+                .foregroundStyle(tint(c.level)).frame(width: 22)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(c.name).font(Brand.sans(13, .semibold)).foregroundStyle(Brand.textPrimary)
+                Text(c.detail).font(Brand.mono(11)).foregroundStyle(Brand.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            Text(label(c.level)).font(Brand.mono(9, .medium)).foregroundStyle(tint(c.level))
+                .padding(.horizontal, 7).padding(.vertical, 3)
+                .background(Capsule().fill(tint(c.level).opacity(0.14)))
+        }
+        .padding(.vertical, 10)
     }
 
     private func glyph(_ l: Doctor.Level) -> String {
@@ -49,9 +80,17 @@ struct DoctorView: View {
 
     private func tint(_ l: Doctor.Level) -> Color {
         switch l {
-        case .ok:   return .green
-        case .warn: return .yellow
-        case .fail: return .red
+        case .ok:   return Brand.green
+        case .warn: return Brand.gold
+        case .fail: return Brand.red
+        }
+    }
+
+    private func label(_ l: Doctor.Level) -> String {
+        switch l {
+        case .ok:   return NSLocalizedString("ok", comment: "")
+        case .warn: return NSLocalizedString("warn", comment: "")
+        case .fail: return NSLocalizedString("fail", comment: "")
         }
     }
 
