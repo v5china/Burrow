@@ -11,8 +11,8 @@
 import SwiftUI
 
 struct GlassCard<Content: View>: View {
-    var padding: CGFloat = 14
-    var corner: CGFloat = 16
+    var padding: CGFloat = 16
+    var corner: CGFloat = 20
     var minHeight: CGFloat? = nil
     @ViewBuilder var content: () -> Content
 
@@ -20,14 +20,13 @@ struct GlassCard<Content: View>: View {
         content()
             .padding(padding)
             .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .topLeading)
+            // Borderless: a soft filled surface + a whisper of elevation reads
+            // cleaner than ruled boxes — fewer lines, the fill does the work.
             .background(
                 RoundedRectangle(cornerRadius: corner, style: .continuous)
                     .fill(Brand.cardFill)
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: corner, style: .continuous)
-                    .strokeBorder(Brand.hairline, lineWidth: 1)
-            )
+            .shadow(color: .black.opacity(0.06), radius: 7, x: 0, y: 2)
     }
 }
 
@@ -43,7 +42,7 @@ struct Eyebrow: View {
                 .font(.system(size: 9, weight: .bold))
             Text(NSLocalizedString(text, comment: "").uppercased())
                 .font(Brand.mono(10, .bold))
-                .tracking(0.8)
+                .tracking(1.0)
         }
         .foregroundStyle(color)
     }

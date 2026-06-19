@@ -34,6 +34,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private(set) var maintenance: Maintenance?
     private var queryServer: QueryServer?
     private var statusBar: StatusBarController?
+    /// Dev/verify only: standalone window hosting the HUD (BURROW_OPEN_ON_LAUNCH=hud).
+    private var hudPreview: NSWindow?
 
     /// The one feed hub (issue #53): shared, demand-counted pumps keyed by
     /// query — views bind to feeds instead of owning timers.
@@ -208,12 +210,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // main window straight away (used for screenshot/verify loops).
         if let tab = devLaunchTab,
            #available(macOS 14, *) {
-            let pane: Pane
-            if tab == "settings" { pane = .settings }
-            else if tab == "home" || tab == "status" || tab == "history" || tab == "activity" { pane = .home }
-            else if let tool = Tool(rawValue: tab), Tool.navOrder.contains(tool) { pane = .tool(tool) }
-            else { pane = .home }
-            self.openMainWindow(initial: pane)
+            if tab == "hud" {
+                // Dev/verify: render the HUD content in a normal window so it can
+                // be screenshotted (the real popover needs a menu-bar click).
+                let host = NSHostingView(rootView: PopupView(db: db, live: producer.live,
+                                                             feeds: self.feeds, delegate: self))
+                let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 334, height: 720),
+                                   styleMask: [.titled, .closable], backing: .buffered, defer: false)
+                win.title = "HUD Preview (dev)"
+                win.contentView = host
+                win.setContentSize(host.fittingSize)
+                win.center()
+                NSApp.setActivationPolicy(.regular)
+                win.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+                self.hudPreview = win
+            } else {
+                let pane: Pane
+                if tab == "settings" { pane = .settings }
+                else if tab == "home" || tab == "status" || tab == "history" || tab == "activity" { pane = .home }
+                else if let tool = Tool(rawValue: tab), Tool.navOrder.contains(tool) { pane = .tool(tool) }
+                else { pane = .home }
+                self.openMainWindow(initial: pane)
+            }
         }
     }
 

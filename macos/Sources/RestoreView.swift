@@ -7,8 +7,8 @@
 //  Honest by construction: cache deletions (action "remove") are permanent and
 //  shown locked; only trashed items with a free original path are restorable.
 //
-//  NOTE (hand-test): compile-verified only. Verify against a real cleanup —
-//  the ~/.Trash fallback move and collision handling need a live Trash.
+//  NOTE (hand-test): verify against a real cleanup — the ~/.Trash fallback move
+//  and collision handling need a live Trash.
 //
 
 import SwiftUI
@@ -25,34 +25,74 @@ struct RestoreView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(NSLocalizedString("Restore last cleanup", comment: "")).font(.title2.bold())
-                Text(NSLocalizedString("Only Trash-based removals can be restored — cache deletions are permanent.", comment: ""))
-                    .font(.caption).foregroundStyle(.secondary)
-                if loading { ProgressView().controlSize(.small) }
-                ForEach(rows) { r in
-                    HStack(spacing: 10) {
-                        Image(systemName: r.entry.restorable ? "arrow.uturn.backward.circle" : "lock.circle")
-                            .foregroundStyle(r.entry.restorable ? Color.green : Color.secondary)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text((r.entry.path as NSString).lastPathComponent).font(.headline)
-                            Text(r.entry.reason).font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        if r.entry.restorable {
-                            Button(NSLocalizedString("Restore", comment: "")) { restore(r.entry) }
-                                .buttonStyle(.bordered)
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(NSLocalizedString("Restore last cleanup", comment: ""))
+                        .font(Brand.serif(22, .medium)).foregroundStyle(Brand.textPrimary)
+                    Text(NSLocalizedString("Only Trash-based removals can be restored — cache deletions are permanent.", comment: ""))
+                        .font(Brand.sans(12)).foregroundStyle(Brand.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if loading {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text(NSLocalizedString("Reading the cleanup log…", comment: ""))
+                            .font(Brand.mono(11)).foregroundStyle(Brand.textSecondary)
+                    }
+                    .padding(.vertical, 8)
+                } else if rows.isEmpty {
+                    Text(NSLocalizedString("No restorable items found.", comment: ""))
+                        .font(Brand.mono(11)).foregroundStyle(Brand.textTertiary)
+                        .padding(.vertical, 8)
+                } else {
+                    GlassCard {
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(Array(rows.enumerated()), id: \.element.id) { i, r in
+                                if i > 0 {
+                                    Rectangle().fill(Brand.hairline).frame(height: 1)
+                                }
+                                row(r.entry)
+                            }
                         }
                     }
-                }
-                if !loading, rows.isEmpty {
-                    Text(NSLocalizedString("No restorable items found.", comment: "")).foregroundStyle(.secondary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(20)
         }
+        .scrollIndicators(.hidden)
+        .fadeEdges()
         .task { await reload() }
+    }
+
+    private func row(_ entry: RestorePlan.Entry) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: entry.restorable ? "arrow.uturn.backward.circle.fill" : "lock.circle.fill")
+                .font(.system(size: 15))
+                .foregroundStyle(entry.restorable ? Brand.green : Brand.textTertiary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text((entry.path as NSString).lastPathComponent)
+                    .font(Brand.sans(13, .semibold)).foregroundStyle(Brand.textPrimary).lineLimit(1)
+                Text(entry.reason).font(Brand.mono(10)).foregroundStyle(Brand.textSecondary).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            if entry.restorable {
+                Button { restore(entry) } label: {
+                    Text(NSLocalizedString("Restore", comment: ""))
+                        .font(Brand.sans(11, .semibold)).foregroundStyle(Tool.clean.accent)
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .background(Capsule().fill(Brand.chipFill))
+                }
+                .buttonStyle(.plain)
+            } else {
+                Text(NSLocalizedString("permanent", comment: ""))
+                    .font(Brand.mono(9, .medium)).foregroundStyle(Brand.textTertiary)
+                    .padding(.horizontal, 7).padding(.vertical, 3)
+                    .background(Capsule().fill(Brand.textTertiary.opacity(0.12)))
+            }
+        }
+        .padding(.vertical, 10)
     }
 
     private func reload() async {

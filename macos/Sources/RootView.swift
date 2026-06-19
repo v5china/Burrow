@@ -66,25 +66,43 @@ struct RootView: View {
     var body: some View {
         ZStack {
             VisualEffectBackground().ignoresSafeArea()
-            pane.scrim.ignoresSafeArea()
+            // One stable charcoal ground on every pane — switching tools no
+            // longer re-tints the whole window in that tool's colour.
+            Brand.windowVeil.ignoresSafeArea()
+            // A single soft warm glow in the corner — the house "gradient",
+            // kept ambient rather than a per-tool window wash.
+            Brand.ambientGlow.ignoresSafeArea()
+            // A faint film grain over the ground — tactile, not flat.
+            GrainOverlay()
 
-            VStack(spacing: 0) {
-                TopNav(selected: $pane)
-                    .padding(.top, 13)
-                    .padding(.bottom, 10)
-                if let release = appUpdate.available {
-                    UpdateBanner(release: release,
-                                 onDownload: { NSWorkspace.shared.open(release.url) },
-                                 onDismiss: { appUpdate.dismiss() })
-                        .padding(.horizontal, 18).padding(.bottom, 8)
-                        .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
+            ZStack(alignment: .topLeading) {
+                // Content sits under the floating rail, inset on the left to
+                // clear it. The rail is drawn last so its hover labels fly out
+                // above the pane instead of behind it.
+                VStack(spacing: 0) {
+                    if let release = appUpdate.available {
+                        UpdateBanner(release: release,
+                                     onDownload: { NSWorkspace.shared.open(release.url) },
+                                     onDismiss: { appUpdate.dismiss() })
+                            .padding(.horizontal, 18).padding(.top, 12).padding(.bottom, 4)
+                            .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
+                    }
+                    content
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                content
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.leading, 88)
+                .padding(.top, 12)
+
+                // Floating left rail — a detached, rounded rail of icon buttons
+                // in place of a top tab bar. Padded clear of the traffic lights
+                // and drawn over the content.
+                FloatingRail(selected: $pane)
+                    .padding(.leading, 14)
+                    .padding(.top, 10)
+                    .padding(.bottom, 14)
             }
         }
         .frame(minWidth: 940, minHeight: 640)
-        .environment(\.colorScheme, .dark)
         .animation(.easeInOut(duration: 0.22), value: pane)
         // Sample fast only while a live metrics pane is on screen.
         .onAppear { producer.setForeground(Self.isMetricsPane(pane)) }

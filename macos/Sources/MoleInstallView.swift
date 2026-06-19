@@ -47,7 +47,7 @@ struct MoleInstallView: View {
                     }.buttonStyle(.plain)
                 }
                 .padding(11)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.25)))
+                .background(RoundedRectangle(cornerRadius: 10).fill(Brand.chipFill))
                 .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Brand.hairline, lineWidth: 1))
 
                 Button { NSWorkspace.shared.open(MoleCLI.repoURL) } label: {
@@ -73,8 +73,7 @@ struct MoleInstallView: View {
         }
         .padding(22)
         .frame(width: 460, height: 320)
-        .background(Color(hex: 0x14130E))
-        .environment(\.colorScheme, .dark)
+        .background(Brand.base)
         // Auto-detect `mo` appearing (e.g. right after `brew install mole`) and
         // proceed on our own, so the user doesn't have to return and click
         // Recheck — that manual step is the #1 onboarding drop-off

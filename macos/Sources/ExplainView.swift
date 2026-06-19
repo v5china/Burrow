@@ -61,8 +61,7 @@ struct ExplainView: View {
         }
         .padding(18)
         .frame(width: 440, height: 300)
-        .background(Color(hex: 0x14130E))
-        .environment(\.colorScheme, .dark)
+        .background(Brand.base)
         .onAppear { run() }
         // Dismissing the sheet must cancel the in-flight request — it can
         // be a paid hosted endpoint on a 30–60 s timeout, and reopening
