@@ -51,6 +51,13 @@ struct PopupView: View {
         }
         .padding(13)
         .frame(width: 334)
+        // Warm tactile ground + grain, matching the main window — the HUD used
+        // to ride bare popover material and read as unfinished beside it.
+        .background {
+            Brand.windowVeil
+            Brand.ambientGlow
+            GrainOverlay()
+        }
         .fixedSize(horizontal: false, vertical: true)
         // Three task-scoped subscriptions replace the old 1 s + 20 s timer
         // pair (issue #53): the snapshot and sparkline pumps are shared with
@@ -142,8 +149,8 @@ struct PopupView: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Brand.cardFill))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Brand.hairline, lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Brand.cardFill))
+        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 1)
     }
 
     private var runningCount: Int { ops.ops.filter { $0.phase == .running }.count }
@@ -280,8 +287,8 @@ struct PopupView: View {
         }
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Brand.cardFill))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Brand.hairline, lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Brand.cardFill))
+        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 1)
     }
 
     /// FAN tile — read-only v1 (same rule as Status: no placebo buttons,
@@ -312,8 +319,8 @@ struct PopupView: View {
         }
         .padding(8)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Brand.cardFill))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Brand.hairline, lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Brand.cardFill))
+        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 1)
     }
 
     private func memChip(_ s: MoleStatus) -> (String, Color)? {
@@ -388,8 +395,8 @@ struct PopupView: View {
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 10).fill(Brand.cardFill))
-            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Brand.hairline, lineWidth: 1))
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Brand.cardFill))
+            .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 1)
         }
     }
 

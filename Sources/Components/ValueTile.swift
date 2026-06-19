@@ -88,7 +88,9 @@ struct ValueTile: View {
         }
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Brand.cardFill))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Brand.hairline, lineWidth: 1))
+        // Borderless — matches GlassCard on the main window (fill + whisper of
+        // elevation, no ruled box). The HUD used to outline every tile.
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Brand.cardFill))
+        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 1)
     }
 }
