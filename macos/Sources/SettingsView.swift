@@ -49,7 +49,9 @@ struct SettingsView: View {
     /// means a relaunch is needed before scans can reach protected caches.
     private let fdaAtOpen = Privacy.hasFullDiskAccess()
     @State private var appLanguage: String = Store.appLanguage
-    @State private var launchAtLogin: Bool = SMAppService.mainApp.status == .enabled
+    // Loaded off-main in onAppear — `SMAppService.status` is a synchronous
+    // XPC call that hung the main thread when read in this @State initializer.
+    @State private var launchAtLogin: Bool = false
     @State private var hideDockIcon: Bool = Store.hideDockIcon
     @State private var skipIntro: Bool = Store.skipIntro
     @State private var notifyOnCompletion: Bool = Store.notifyOnCompletion
@@ -69,6 +71,7 @@ struct SettingsView: View {
     @State private var newPattern = ""
     @State private var removalMode: CacheRemovalMode = Store.cacheRemovalMode
     @State private var sampleIntervalSeconds: Int = Store.sampleIntervalSeconds
+    @State private var useStatusWatch: Bool = Store.useStatusWatch
     @State private var retentionDays: Int = Store.retentionDays
     @State private var autoVacuum: Bool = Store.autoVacuum
     @State private var dbSizeText: String = "—"
@@ -153,7 +156,7 @@ struct SettingsView: View {
             .frame(width: 460, height: 440)
         }
         .onAppear {
-            refreshStatusLabels(); loadMoleVersion(); loadTouchIDStatus()
+            refreshStatusLabels(); loadMoleVersion(); loadTouchIDStatus(); loadLaunchAtLogin()
             whitelistPatterns = MoleWhitelist.live.patterns()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -412,6 +415,8 @@ struct SettingsView: View {
                     Store.sampleIntervalSeconds = $0
                 }
                 footnote("Burrow runs `mo status --json` at this cadence. 60 s is plenty for charts; tighter intervals give finer detail at the cost of more subprocess churn.")
+                toggleRow("Stream live status (experimental)", isOn: $useStatusWatch) { Store.useStatusWatch = $0 }
+                footnote("Mole 1.44+ only: streams `mo status --watch` continuously instead of polling — lower latency and less subprocess churn. Falls back to polling on older mo or if the stream drops. Takes effect after a relaunch.")
             }
         }
     }
@@ -589,6 +594,16 @@ struct SettingsView: View {
         DispatchQueue.global(qos: .userInitiated).async {
             let v = MoleCLI.version()
             DispatchQueue.main.async { moleVersion = v.map { "v\($0)" } ?? "not found" }
+        }
+    }
+
+    /// Read the login-item status off-main — `SMAppService.status` is a
+    /// synchronous XPC call (a mach send-and-wait) that hung the main thread
+    /// when it ran in the view's @State initializer (App-Hang).
+    private func loadLaunchAtLogin() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let on = SMAppService.mainApp.status == .enabled
+            DispatchQueue.main.async { launchAtLogin = on }
         }
     }
 
@@ -1139,26 +1154,32 @@ struct SettingsView: View {
     // MARK: - Status labels
 
     private func refreshStatusLabels() {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory,
-                                               in: .userDomainMask).first!
-            .appendingPathComponent("Burrow", isDirectory: true)
-        var total: Int64 = 0
-        if let enumerator = FileManager.default.enumerator(at: support,
-                                                           includingPropertiesForKeys: [.fileSizeKey]) {
-            for case let url as URL in enumerator {
-                if let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize {
-                    total += Int64(size)
-                }
-            }
-        }
-        self.dbSizeText = Fmt.bytes(total)
-
+        // The maintenance label is cheap (in-memory) — set it synchronously.
         if let last = AppDelegate.shared?.maintenance?.lastRunAt {
             let delta = Int(Date().timeIntervalSince(last))
             self.lastMaintenanceText = String(format: NSLocalizedString("%ds ago · pruned %d rows", comment: ""),
                                               delta, AppDelegate.shared?.maintenance?.lastPruneDeleted ?? 0)
         } else {
             self.lastMaintenanceText = NSLocalizedString("not yet run", comment: "")
+        }
+        // Sizing the support dir walks every file under it (the metrics SQLite
+        // store grows large over time) — off the main thread so opening
+        // Settings can't hang on a deep enumeration (App-Hang).
+        DispatchQueue.global(qos: .utility).async {
+            let support = FileManager.default.urls(for: .applicationSupportDirectory,
+                                                   in: .userDomainMask).first!
+                .appendingPathComponent("Burrow", isDirectory: true)
+            var total: Int64 = 0
+            if let enumerator = FileManager.default.enumerator(at: support,
+                                                               includingPropertiesForKeys: [.fileSizeKey]) {
+                for case let url as URL in enumerator {
+                    if let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize {
+                        total += Int64(size)
+                    }
+                }
+            }
+            let text = Fmt.bytes(total)
+            DispatchQueue.main.async { self.dbSizeText = text }
         }
     }
 }
