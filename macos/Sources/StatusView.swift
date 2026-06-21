@@ -18,11 +18,17 @@ import AppKit
 /// The Overview section of Home: live metric cards + the process table.
 struct StatusView: View {
     @StateObject private var model: StatusModel
-    @ObservedObject private var io: LiveFeed
+    /// The 1 Hz live feed. Deliberately NOT `@ObservedObject` here: only the
+    /// small Disk / Net cards observe it (`LiveDiskCard` / `LiveNetCard`), so a
+    /// per-second rate/ring tick re-renders just those two tiles instead of the
+    /// whole dashboard — every chart tile AND the 100-row process table — every
+    /// second. That StatusView-wide 1 Hz invalidation was the App-Hang fan-out
+    /// (BURROW-4x: layout/AttributeGraph churn, per-row Menus rebuilt at 1 Hz).
+    private let live: LiveFeed
 
     init(db: DB, live: LiveFeed, feeds: FeedHub) {
         _model = StateObject(wrappedValue: StatusModel(db: db, live: live, feeds: feeds))
-        self.io = live
+        self.live = live
     }
 
     private let row1H: CGFloat = 162
@@ -40,8 +46,9 @@ struct StatusView: View {
                         gpuTile(s).frame(minHeight: row1H)
                     }
                     HStack(spacing: 16) {
-                        DiskCard(s: s, liveRead: io.readMBs, liveWrite: io.writeMBs, minHeight: row2H, db: model.db)
-                        netTile(s).frame(minHeight: row2H)
+                        LiveDiskCard(s: s, io: live, minHeight: row2H, db: model.db)
+                        LiveNetCard(s: s, io: live, fallbackRx: model.netRxHist, fallbackTx: model.netTxHist)
+                            .frame(minHeight: row2H)
                         fanTile(s).frame(minHeight: row2H)
                     }
                     // Battery card carries the ring gauges (Mac + connected
@@ -171,7 +178,31 @@ struct StatusView: View {
         }
     }
 
-    private func netTile(_ s: MoleStatus) -> ValueTile {
+}
+
+/// Disk tile that observes the 1 Hz `LiveFeed` HERE (not in StatusView), so a
+/// per-second throughput tick re-renders only this tile.
+struct LiveDiskCard: View {
+    let s: MoleStatus
+    @ObservedObject var io: LiveFeed
+    var minHeight: CGFloat? = nil
+    var db: DB? = nil
+    var body: some View {
+        DiskCard(s: s, liveRead: io.readMBs, liveWrite: io.writeMBs, minHeight: minHeight, db: db)
+    }
+}
+
+/// Network tile that observes the 1 Hz `LiveFeed` HERE, for the same reason —
+/// the per-second rate/ring updates stay scoped to this tile rather than
+/// invalidating the whole dashboard.
+struct LiveNetCard: View {
+    let s: MoleStatus
+    @ObservedObject var io: LiveFeed
+    /// Sparkline fallback for the first tick, before the 1 s ring has samples.
+    var fallbackRx: [Double] = []
+    var fallbackTx: [Double] = []
+
+    var body: some View {
         let snapNet = s.network.first(where: { !$0.ip.isEmpty }) ?? s.network.first
         // Prefer the native 1 s monitor (catches bursts the mo poll misses); the
         // mo snapshot is the fallback before the monitor has any samples.
@@ -185,8 +216,8 @@ struct StatusView: View {
         // Two lines, one scale: download (green, ↓) and upload (blue, ↑) —
         // matching the ↓/↑ figures in the footnote. Tile window = the recent
         // 2 min of the 1 s ring; longer windows live in the History tab.
-        let rxHist = useLive ? io.netRxHistory(lastSeconds: 120) : model.netRxHist
-        let txHist = useLive ? io.netTxHistory(lastSeconds: 120) : model.netTxHist
+        let rxHist = useLive ? io.netRxHistory(lastSeconds: 120) : fallbackRx
+        let txHist = useLive ? io.netTxHistory(lastSeconds: 120) : fallbackTx
         return ValueTile(
             eyebrow: "Network", glyph: "network", accent: Brand.green,
             value: value, unit: unit, chip: chip,
