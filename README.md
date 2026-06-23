@@ -24,21 +24,15 @@ Code, Cursor, Codex…) can ask "what's been happening on this machine."
 .NET 8 preview app, Windows telemetry/history, tray HUD, loopback HTTP, MCP
 stdio bridge, CI, tests, and unsigned release packaging.
 
-`brew install --cask caezium/tap/burrow`  ·  Windows: [build the preview from source](#windows-preview-build)
+Mac: `brew install --cask caezium/tap/burrow`
 
-<a href="https://www.star-history.com/?repos=caezium%2FBurrow&type=timeline&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=caezium/Burrow&type=timeline&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=caezium/Burrow&type=timeline&legend=top-left" />
-   <img height="350" alt="Star History Chart" src="https://api.star-history.com/chart?repos=caezium/Burrow&type=timeline&legend=top-left" />
- </picture>
-</a>
+Windows: download from [releases](https://github.com/caezium/Burrow/releases/latest)
 
 ## Contents
 
-- [Platforms](#platforms)
 - [Screenshots](#screenshots)
 - [The tools](#the-tools)
+- [Platforms](#platforms)
 - [Roadmap](#roadmap)
 - [How Burrow compares to other tools](#how-burrow-compares-to-other-tools)
 - [Settings](#settings)
@@ -50,22 +44,6 @@ stdio bridge, CI, tests, and unsigned release packaging.
 - [Develop & test](#develop--test)
 - [Architecture](#architecture)
 - [Attribution & license](#attribution--license)
-
-## Platforms
-
-| | macOS | Windows |
-|---|---|---|
-| Status | **Stable** — flagship | **Preview** — checked in under `windows/` |
-| Engine | `mo` (Go CLI, via Homebrew) | bundled Mole/PowerShell engine plus Windows fallbacks where needed |
-| UI | SwiftUI, translucent menu-bar app | WinUI 3 / .NET 8 |
-| Install | `brew install --cask caezium/tap/burrow` | build from source; unsigned preview artifacts via `windows/scripts/build-release.ps1` |
-| Source | [`macos/`](macos/) | [`windows/`](windows/) |
-
-Both apps live in this one repo, side by side, sharing this README, the landing
-site, and release documentation. The Windows preview currently includes a native
-shell, tool pages, local telemetry/history, loopback HTTP/MCP surfaces, tests,
-CI, and unsigned local packaging. See the [Windows architecture notes](windows/docs/windows-architecture.md)
-and [release notes](windows/docs/release.md).
 
 ## Screenshots
 
@@ -173,6 +151,23 @@ A live, glanceable read of your Mac's vitals, refreshed continuously:
   an optional localhost HTTP API, so any AI agent can query your Mac's recent
   state. See [Use it with your AI agent](#use-it-with-your-ai-agent).
 
+
+## Platforms
+
+| | macOS | Windows |
+|---|---|---|
+| Status | **Stable** — flagship | **Preview** — checked in under `windows/` |
+| Engine | `mo` (Go CLI, via Homebrew) | bundled Mole/PowerShell engine plus Windows fallbacks where needed |
+| UI | SwiftUI, translucent menu-bar app | WinUI 3 / .NET 8 |
+| Install | `brew install --cask caezium/tap/burrow` | build from source; unsigned preview artifacts via `windows/scripts/build-release.ps1` |
+| Source | [`macos/`](macos/) | [`windows/`](windows/) |
+
+Both apps live in this one repo, side by side, sharing this README, the landing
+site, and release documentation. The Windows preview currently includes a native
+shell, tool pages, local telemetry/history, loopback HTTP/MCP surfaces, tests,
+CI, and unsigned local packaging. See the [Windows architecture notes](windows/docs/windows-architecture.md)
+and [release notes](windows/docs/release.md).
+
 ### Windows preview
 
 The checked-in Windows app currently includes:
@@ -212,6 +207,16 @@ The full board, with status and voting, lives at **[burrow.henryzh.dev/roadmap](
 
 _Recently shipped: No-freeze live dashboard, Streaming live status (`mo status --watch`), One-click Update with Homebrew, A warm visual redesign, Ports & Get Online — see the [changelog](https://burrow.henryzh.dev/releases.html)._
 <!-- ROADMAP:END -->
+
+
+<a href="https://www.star-history.com/?repos=caezium%2FBurrow&type=timeline&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=caezium/Burrow&type=timeline&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=caezium/Burrow&type=timeline&legend=top-left" />
+   <img height="350" alt="Star History Chart" src="https://api.star-history.com/chart?repos=caezium/Burrow&type=timeline&legend=top-left" />
+ </picture>
+</a>
+
 
 ## How Burrow compares to other tools
 
