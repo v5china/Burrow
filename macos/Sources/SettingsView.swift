@@ -960,7 +960,7 @@ struct SettingsView: View {
                 }
             }
             optionPicker("Color", value: item.color.title) {
-                ForEach(MenuBarColorMode.allCases) { c in
+                ForEach(item.metric.colorModes) { c in
                     Button(c.title) { updateMenuBarItem(idx) { $0.color = c } }
                 }
             }

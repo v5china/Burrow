@@ -88,6 +88,14 @@ enum MenuBarMetric: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    /// Colour modes offered for this metric. "By pressure" reads macOS memory
+    /// pressure, so it's only meaningful for `.memory` — don't offer it
+    /// elsewhere (it would silently fall back to "By utilization").
+    var colorModes: [MenuBarColorMode] {
+        self == .memory ? MenuBarColorMode.allCases
+                        : MenuBarColorMode.allCases.filter { $0 != .pressure }
+    }
+
     /// Two-channel metrics (down/up, read/write) — eligible for the speed style.
     var isDual: Bool { self == .network || self == .diskIO }
 
@@ -365,6 +373,19 @@ enum MenuBarRenderer {
         }
     }
 
+    /// Temperature ramp (°C), so a temp widget actually warns when hot instead
+    /// of sitting flat blue. Tuned for Mac CPU/GPU package temps (idle ~40,
+    /// sustained load ~80, throttle ~100): cool → green, warm → gold, hot →
+    /// orange, very hot → red.
+    private static func temperatureColor(_ celsius: Double) -> NSColor {
+        switch celsius {
+        case 95...:   return NSColor(Brand.red)
+        case 85..<95: return NSColor(Brand.orange)
+        case 70..<85: return NSColor(Brand.gold)
+        default:      return NSColor(Brand.green)
+        }
+    }
+
     static func color(for item: MenuBarItem, value: Double, values: MenuBarMetricValues) -> NSColor {
         if let fixed = item.color.fixedColor { return fixed }   // named colours
         switch item.color {
@@ -378,6 +399,7 @@ enum MenuBarRenderer {
             fallthrough
         case .utilization:
             if item.metric == .battery { return batteryColor(value, charging: values.batteryCharging) }
+            if item.metric == .temperature { return temperatureColor(value) }
             if item.metric.isPercentage { return utilization(value) }
             return NSColor(Brand.blue)
         default:       return .labelColor   // unreachable: named modes handled above
