@@ -137,7 +137,13 @@ enum StartupInventory {
             ?? (dict["ProgramArguments"] as? [String])?.first
         var problem: StartupItem.Problem?
         if let exe = executable, !FileManager.default.fileExists(atPath: exe) {
-            problem = .danglingExecutable
+            // A target on an external drive that's currently UNPLUGGED isn't
+            // broken — don't flag it (PRD §Startup, RemovableVolumeGuard).
+            let mounted = Set((try? FileManager.default.contentsOfDirectory(atPath: "/Volumes"))?
+                .map { "/Volumes/\($0)" } ?? [])
+            if RemovableVolumeGuard.classify(missingPath: exe, mountedVolumes: mounted) == .broken {
+                problem = .danglingExecutable
+            }
         }
         return StartupItem(label: label, kind: kind, scope: scope,
                            plistPath: url.path, executable: executable, problem: problem)
