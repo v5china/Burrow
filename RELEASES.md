@@ -1,3 +1,41 @@
+# Burrow 0.8.3
+
+A metrics & menu-bar release: real memory-pressure reporting, a power-draw
+widget, pressure-aware coloring everywhere, a live menu-bar preview, two new
+runner animations, and a snappier popover. Still local-first.
+
+## Added
+- **Power-draw widget.** Live system wattage (W) as a menu-bar metric and
+  dashboard tile.
+- **Real memory pressure.** "By pressure" now reads actual macOS memory pressure
+  — `(wired + compressed) / total` via `host_statistics64`, the same figure
+  Activity Monitor reports — instead of reusing the CPU-style utilization ramp.
+  Shown as a percentage on the memory tiles, colored green ≤59% / orange 60–79% /
+  red ≥80%. (#202)
+- **Memory detail card.** The Status dashboard breaks memory down into used /
+  free / cached / swap.
+- **Live menu-bar preview + layout presets.** Settings previews your *real*
+  metrics as you configure them, with one-tap layout presets.
+- **Two new runner animations** — Wave and Bars.
+
+## Changed
+- **Consistent pressure coloring** across the dashboard tile, popover,
+  memory-detail card, and menu bar.
+- **Live popover sparklines.** CPU / memory / GPU tick every second (about a
+  minute of history).
+- **Honest color picker.** "By pressure" is offered only where it applies
+  (memory); the temperature color ramp was corrected.
+
+## Fixed
+- **Brewfile import/export pickers no longer trip the hang detector** (ANR
+  false-positives).
+- **App-Hang reports from memory-starved machines are dropped** before sending —
+  they were environmental, not Burrow bugs. (#197)
+
+## Performance
+- **Snappier popover** — the metric grid no longer re-renders on unrelated state
+  changes.
+
 # Burrow 0.8.2
 
 A fix release: a Full Disk Access grant now actually takes effect, and Burrow
