@@ -33,12 +33,52 @@ enum Doctor {
         var lastBackupDaysAgo: Int? = nil
         /// SMART verdict: true = verified, false = failing, nil = unreadable.
         var smartVerified: Bool? = nil
+        // Security posture (PRD §Doctor). `.unknown` on every facet = no data,
+        // so the Security check is omitted (keeps the MCP seam + old tests valid).
+        var sip: SecurityPosture.State = .unknown
+        var gatekeeper: SecurityPosture.State = .unknown
+        var fileVault: SecurityPosture.State = .unknown
+        var firewall: SecurityPosture.State = .unknown
+        /// Battery max-capacity %; nil = desktop / no battery → omitted.
+        var batteryHealthPct: Int? = nil
+        /// System-wide CPU load %; nil = unknown → omitted.
+        var cpuLoadPercent: Double? = nil
     }
 
     /// One `Check` per facet, in a stable order. Each verdict is independent;
-    /// callers can sort by `level` to surface failures first.
+    /// callers can sort by `level` to surface failures first. The security /
+    /// battery / CPU checks are appended only when their facts are present.
     static func report(_ i: Input) -> [Check] {
-        [engine(i), permissions(i), memory(i), disk(i), diskHealth(i), backup(i), errors(i)]
+        var checks = [engine(i), permissions(i), memory(i), disk(i), diskHealth(i), backup(i)]
+        if let s = security(i) { checks.append(s) }
+        if let b = battery(i) { checks.append(b) }
+        if let c = highCPU(i) { checks.append(c) }
+        checks.append(errors(i))
+        return checks
+    }
+
+    private static func security(_ i: Input) -> Check? {
+        let facets: [(String, SecurityPosture.State)] = [
+            ("SIP", i.sip), ("Gatekeeper", i.gatekeeper), ("FileVault", i.fileVault), ("Firewall", i.firewall)]
+        guard facets.contains(where: { $0.1 != .unknown }) else { return nil }   // no data → omit
+        let off = facets.filter { $0.1 == .off }.map(\.0)
+        return off.isEmpty
+            ? Check(name: "Security", level: .ok, detail: "SIP, Gatekeeper, FileVault, firewall all on")
+            : Check(name: "Security", level: .warn, detail: "off: " + off.joined(separator: ", "))
+    }
+
+    private static func battery(_ i: Input) -> Check? {
+        guard let h = i.batteryHealthPct else { return nil }
+        return h < 80
+            ? Check(name: "Battery health", level: .warn, detail: "\(h)% of original capacity")
+            : Check(name: "Battery health", level: .ok, detail: "\(h)% capacity")
+    }
+
+    private static func highCPU(_ i: Input) -> Check? {
+        guard let c = i.cpuLoadPercent else { return nil }
+        return c >= 90
+            ? Check(name: "CPU load", level: .warn, detail: "high — \(Int(c.rounded()))%")
+            : Check(name: "CPU load", level: .ok, detail: "\(Int(c.rounded()))%")
     }
 
     private static func engine(_ i: Input) -> Check {

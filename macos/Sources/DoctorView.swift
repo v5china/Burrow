@@ -12,6 +12,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct DoctorView: View {
     let db: DB
@@ -20,8 +21,16 @@ struct DoctorView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                Text(NSLocalizedString("Diagnostics", comment: ""))
-                    .font(Brand.serif(22, .medium)).foregroundStyle(Brand.textPrimary)
+                HStack {
+                    Text(NSLocalizedString("Diagnostics", comment: ""))
+                        .font(Brand.serif(22, .medium)).foregroundStyle(Brand.textPrimary)
+                    Spacer()
+                    Button { copyDiagnostics() } label: {
+                        Label(NSLocalizedString("Copy", comment: ""), systemImage: "doc.on.doc")
+                            .font(Brand.mono(11)).foregroundStyle(Brand.textSecondary)
+                    }
+                    .buttonStyle(.plain).disabled(checks.isEmpty)
+                }
 
                 if checks.isEmpty {
                     HStack(spacing: 8) {
@@ -113,8 +122,14 @@ struct DoctorView: View {
         // takes seconds. Running them inline here (`.task` is MainActor-isolated)
         // froze the main thread long enough to trip Sentry's ≥2000ms App Hang
         // detector. Probe off the main thread, then publish on the main actor.
+        let cpuLoad = latest?.cpu.usage
         let probes = await Task.detached(priority: .utility) {
-            (backup: BackupStatus.lastBackupDaysAgo(), smart: DiskHealth.smartVerified())
+            (backup: BackupStatus.lastBackupDaysAgo(),
+             smart: DiskHealth.smartVerified(),
+             sip: SecurityPosture.sip(DoctorView.run("/usr/bin/csrutil", ["status"])),
+             gatekeeper: SecurityPosture.gatekeeper(DoctorView.run("/usr/sbin/spctl", ["--status"])),
+             fileVault: SecurityPosture.fileVault(DoctorView.run("/usr/bin/fdesetup", ["status"])),
+             firewall: SecurityPosture.firewall(DoctorView.run("/usr/libexec/ApplicationFirewall/socketfilterfw", ["--getglobalstate"])))
         }.value
         checks = Doctor.report(.init(
             fullDiskAccess: fullDiskAccess,
@@ -122,6 +137,32 @@ struct DoctorView: View {
             diskFreeBytes: free, diskTotalBytes: total,
             recentErrorCount: recentErrorCount,
             lastBackupDaysAgo: probes.backup,
-            smartVerified: probes.smart))
+            smartVerified: probes.smart,
+            sip: probes.sip, gatekeeper: probes.gatekeeper,
+            fileVault: probes.fileVault, firewall: probes.firewall,
+            cpuLoadPercent: cpuLoad))
+    }
+
+    /// Capture a short system command's stdout (off-main; used for the security
+    /// posture probes). Self-contained so it doesn't depend on the engine seam.
+    private static func run(_ path: String, _ args: [String]) -> String {
+        guard FileManager.default.isExecutableFile(atPath: path) else { return "" }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: path)
+        p.arguments = args
+        let pipe = Pipe()
+        p.standardOutput = pipe
+        p.standardError = pipe
+        do { try p.run() } catch { return "" }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        p.waitUntilExit()
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    private func copyDiagnostics() {
+        let text = checks.map { "[\(label($0.level).uppercased())] \($0.name): \($0.detail)" }
+            .joined(separator: "\n")
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 }
