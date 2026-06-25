@@ -142,6 +142,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         appendHistory(.cpu, s.cpu.usage)
         appendHistory(.memory, s.memory.usedPercent)
         if let g = s.gpu?.first, g.usage >= 0 { appendHistory(.gpu, g.usage) }
+        if let p = s.thermal?.systemPower, p > 0 { appendHistory(.power, p) }
         renderMetrics()
     }
 
@@ -184,6 +185,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             if let t = s.thermal {
                 if t.fanSpeed > 0 || (t.fanCount ?? 0) > 0 { v.primary[.fan] = Double(t.fanSpeed) }
                 if let temp = t.bestTemp { v.primary[.temperature] = temp }
+                if t.systemPower > 0 { v.primary[.power] = t.systemPower }
             }
             if let b = s.batteries?.first {
                 v.primary[.battery] = b.percent
@@ -198,10 +200,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         v.histories[.cpu]    = menuBarHistory[.cpu]
         v.histories[.memory] = menuBarHistory[.memory]
         v.histories[.gpu]    = menuBarHistory[.gpu]
-        // Real memory-pressure level for the "By pressure" colour mode — a
-        // cheap native sysctl read here on the value-build pass, not the draw
-        // path (see MemoryPressure in MenuBarWidgets).
-        v.memoryPressureLevel = MemoryPressure.level()
+        v.histories[.power]  = menuBarHistory[.power]
+        // Memory-pressure percentage (compressor share) for the "By pressure"
+        // colour — the same signal the dashboard/popover memory tiles read.
+        v.memoryPressurePercent = MemoryPressure.percent()
         return v
     }
 
