@@ -885,6 +885,7 @@ struct SettingsView: View {
     @ViewBuilder
     private var menuBarMetricsEditor: some View {
         VStack(spacing: 4) {
+            if !menuBarItems.isEmpty { menuBarPreview }
             if menuBarItems.isEmpty {
                 Text(NSLocalizedString("No metrics yet — add one below.", comment: ""))
                     .font(Brand.sans(11)).foregroundStyle(Brand.textTertiary)
@@ -901,7 +902,7 @@ struct SettingsView: View {
                 .background(RoundedRectangle(cornerRadius: 8)
                     .fill(expandedMenuBarItem == item.id ? Brand.cardFill : Color.clear))
             }
-            HStack {
+            HStack(spacing: 12) {
                 Menu {
                     ForEach(MenuBarMetric.allCases) { m in
                         Button { addMenuBarMetric(m) } label: { Label(m.title, systemImage: m.glyph) }
@@ -911,11 +912,65 @@ struct SettingsView: View {
                         .font(Brand.sans(12)).foregroundStyle(Brand.green)
                 }
                 .menuStyle(.borderlessButton).fixedSize()
+                Menu {
+                    ForEach(Self.menuBarPresets, id: \.name) { preset in
+                        Button(preset.name) { applyMenuBarPreset(preset.items) }
+                    }
+                } label: {
+                    Label(NSLocalizedString("Presets", comment: ""), systemImage: "square.grid.2x2")
+                        .font(Brand.sans(12)).foregroundStyle(Brand.textSecondary)
+                }
+                .menuStyle(.borderlessButton).fixedSize()
                 Spacer()
             }
             .padding(.top, 2)
         }
         .padding(.vertical, 4)
+    }
+
+    /// Live preview of the configured row, rendered with representative values
+    /// so the layout is visible while editing (not live data).
+    private var menuBarPreview: some View {
+        HStack {
+            Spacer()
+            if let img = MenuBarRenderer.image(items: menuBarItems, values: Self.menuBarPreviewValues) {
+                Image(nsImage: img)
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Brand.cardFill))
+            }
+            Spacer()
+        }
+        .padding(.bottom, 4)
+    }
+
+    /// Representative values for the Settings preview only.
+    private static let menuBarPreviewValues: MenuBarMetricValues = {
+        var v = MenuBarMetricValues()
+        v.primary = [.cpu: 42, .memory: 68, .gpu: 31, .diskUsage: 55, .network: 8.4,
+                     .diskIO: 3.1, .fan: 2200, .temperature: 74, .battery: 86, .power: 14]
+        v.secondary = [.network: 1.2, .diskIO: 0.6]
+        v.histories = [.cpu: [30, 44, 38, 52, 42], .memory: [60, 63, 66, 68],
+                       .gpu: [18, 26, 31], .network: [4, 7, 8.4, 6, 8.4],
+                       .diskIO: [1, 2.4, 3.1], .power: [10, 12, 14, 13, 14]]
+        return v
+    }()
+
+    /// One-click starting layouts for the metric row.
+    private struct MenuBarPreset { let name: String; let items: [MenuBarItem] }
+    private static let menuBarPresets: [MenuBarPreset] = [
+        .init(name: NSLocalizedString("CPU · RAM", comment: ""),
+              items: [MenuBarItem(metric: .cpu, style: .value), MenuBarItem(metric: .memory, style: .value)]),
+        .init(name: NSLocalizedString("CPU · RAM · Net · Disk", comment: ""),
+              items: [MenuBarItem(metric: .cpu, style: .value), MenuBarItem(metric: .memory, style: .value),
+                      MenuBarItem(metric: .network, style: .speed), MenuBarItem(metric: .diskUsage, style: .bar)]),
+        .init(name: NSLocalizedString("Everything", comment: ""),
+              items: MenuBarMetric.allCases.map { MenuBarItem(metric: $0, style: $0.styles.first ?? .value) }),
+    ]
+
+    private func applyMenuBarPreset(_ items: [MenuBarItem]) {
+        menuBarItems = items
+        expandedMenuBarItem = nil
+        commitMenuBarItems()
     }
 
     private func menuBarMetricRow(index idx: Int, item: MenuBarItem) -> some View {
