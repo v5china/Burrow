@@ -364,7 +364,7 @@ struct PopupView: View {
 
     private func memChip(_ s: MoleStatus) -> (String, Color)? {
         let p = MemoryPressure.percent()
-        return (String(format: NSLocalizedString("%d%% pressure", comment: ""), p), MemoryPressure.tint(percent: p))
+        return (String(format: NSLocalizedString("%d%%", comment: ""), p), MemoryPressure.tint(percent: p))
     }
 
     private func netValue(_ s: MoleStatus) -> (String, String) {

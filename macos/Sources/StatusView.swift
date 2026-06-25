@@ -147,7 +147,7 @@ struct StatusView: View {
         return ValueTile(
             eyebrow: "Memory", glyph: "memorychip", accent: MemoryPressure.tint(percent: lvl),
             value: String(format: "%.0f", m.usedPercent), unit: "%",
-            chip: (String(format: NSLocalizedString("%d%% pressure", comment: ""), lvl), MemoryPressure.tint(percent: lvl)),
+            chip: (String(format: NSLocalizedString("%d%%", comment: ""), lvl), MemoryPressure.tint(percent: lvl)),
             values: model.memHist, chartStyle: .area,
             footnote: String(format: NSLocalizedString("%.1f / %.1f GB · swap %.1f GB", comment: ""), used, total, Fmt.gib(m.swapUsed)))
     }
