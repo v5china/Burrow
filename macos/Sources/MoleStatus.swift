@@ -18,7 +18,7 @@
 
 import Foundation
 
-struct MoleStatus: Codable {
+struct MoleStatus: Codable, Equatable {
     let collectedAt: Date
     let host: String
     let platform: String
@@ -119,7 +119,7 @@ struct MoleStatus: Codable {
     }()
 }
 
-struct Hardware: Codable {
+struct Hardware: Codable, Equatable {
     let model: String
     let cpuModel: String
     let totalRam: String
@@ -135,7 +135,7 @@ struct Hardware: Codable {
     }
 }
 
-struct CPUStatus: Codable {
+struct CPUStatus: Codable, Equatable {
     let usage: Double
     let perCore: [Double]?
     let load1: Double
@@ -157,7 +157,7 @@ struct CPUStatus: Codable {
     }
 }
 
-struct MemoryStatus: Codable {
+struct MemoryStatus: Codable, Equatable {
     let used: UInt64
     let total: UInt64
     /// `available` is documented in Mole's source but omitted from the
@@ -178,7 +178,7 @@ struct MemoryStatus: Codable {
     }
 }
 
-struct DiskIOStatus: Codable {
+struct DiskIOStatus: Codable, Equatable {
     let readRate: Double   // MB/s
     let writeRate: Double  // MB/s
 
@@ -188,7 +188,7 @@ struct DiskIOStatus: Codable {
     }
 }
 
-struct DiskStatus: Codable {
+struct DiskStatus: Codable, Equatable {
     let mount: String
     let used: UInt64
     let total: UInt64
@@ -202,7 +202,7 @@ struct DiskStatus: Codable {
     }
 }
 
-struct NetworkStatus: Codable {
+struct NetworkStatus: Codable, Equatable {
     let name: String
     let rxRateMbs: Double
     let txRateMbs: Double
@@ -216,7 +216,7 @@ struct NetworkStatus: Codable {
     }
 }
 
-struct BatteryStatus: Codable {
+struct BatteryStatus: Codable, Equatable {
     let percent: Double
     let status: String
     let timeLeft: String
@@ -233,7 +233,7 @@ struct BatteryStatus: Codable {
     }
 }
 
-struct ThermalStatus: Codable {
+struct ThermalStatus: Codable, Equatable {
     let cpuTemp: Double
     let gpuTemp: Double
     /// Battery temperature (°C). On Apple Silicon, `cpu_temp`/`gpu_temp` are
@@ -289,7 +289,7 @@ struct ProcessInfo: Codable, Equatable {
     }
 }
 
-struct GPUStatus: Codable {
+struct GPUStatus: Codable, Equatable {
     let name: String
     /// `-1` when the platform can't report GPU utilisation (common on
     /// Apple Silicon); treat negative as "unavailable".
@@ -308,13 +308,13 @@ struct GPUStatus: Codable {
     }
 }
 
-struct ProxyStatus: Codable {
+struct ProxyStatus: Codable, Equatable {
     let enabled: Bool
     let type: String
     let host: String
 }
 
-struct BluetoothDevice: Codable {
+struct BluetoothDevice: Codable, Equatable {
     let name: String
     let connected: Bool
     /// Mole reports battery as a string ("85%" or empty). Parse the percent

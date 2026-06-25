@@ -14,6 +14,24 @@
 import SwiftUI
 import AppKit
 
+/// Re-renders `content` only when `key` changes — lets a heavy, snapshot-driven
+/// block (the metric grid) skip rebuilding when an unrelated @Published on the
+/// popover ticks (ops, Stay-Awake, clean-watch, privacy). Pair with `.equatable()`.
+private struct EquatableGate<Key: Equatable, Content: View>: View, Equatable {
+    let key: Key
+    @ViewBuilder var content: () -> Content
+    var body: some View { content() }
+    static func == (lhs: EquatableGate, rhs: EquatableGate) -> Bool { lhs.key == rhs.key }
+}
+
+/// Everything the popover metric grid depends on; unchanged ⇒ the grid (6 tiles
+/// + charts) is not rebuilt. Relies on `MoleStatus: Equatable`.
+private struct MetricGridKey: Equatable {
+    let snap: MoleStatus
+    let cpu, gpu, mem, net, fan: [Double]
+    let tiles: Set<MenuBarMetric>
+}
+
 struct PopupView: View {
     @StateObject private var model: HUDModel
     @ObservedObject private var ops = OperationCenter.shared
@@ -42,7 +60,14 @@ struct PopupView: View {
             }
             if sections.contains(.activity), ops.hasActivity { activitySection }
             if let s = model.snap {
-                if sections.contains(.metrics) { metricGrid(s) }
+                if sections.contains(.metrics) {
+                    EquatableGate(key: MetricGridKey(snap: s, cpu: model.cpuHist, gpu: model.gpuHist,
+                                                     mem: model.memHist, net: model.netHist,
+                                                     fan: model.fanHist, tiles: Store.popupTiles)) {
+                        metricGrid(s)
+                    }
+                    .equatable()
+                }
                 if sections.contains(.battery) { batteryCard(s) }
                 if sections.contains(.processes) { topProcesses(s) }
             } else {
