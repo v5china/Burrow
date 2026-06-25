@@ -25,6 +25,7 @@
 
 import AppKit
 import SwiftUI
+import Darwin   // sysctlbyname — native memory-pressure level
 
 // MARK: - Model
 
@@ -268,8 +269,30 @@ struct MenuBarMetricValues {
     /// Sparkline series (oldest→newest), already downsampled by the controller.
     var histories: [MenuBarMetric: [Double]] = [:]
     var batteryCharging = false
+    /// Current macOS memory-pressure level (`kern.memorystatus_vm_pressure_level`):
+    /// 1 = normal, 2 = warning, 4 = critical. Drives the "By pressure" colour.
+    var memoryPressureLevel: Int = MemoryPressure.normal
 
     func has(_ m: MenuBarMetric) -> Bool { primary[m] != nil }
+}
+
+/// The current macOS memory-pressure level, read natively from
+/// `kern.memorystatus_vm_pressure_level` — the same signal Activity Monitor's
+/// Memory Pressure graph and `DISPATCH_SOURCE_TYPE_MEMORYPRESSURE` report. It's
+/// a discrete level, NOT a percentage.
+enum MemoryPressure {
+    static let normal = 1, warning = 2, critical = 4
+
+    /// Point read of the current level — one cheap sysctl. Called on the
+    /// value-build pass, never on the draw path. Falls back to `normal` if the
+    /// sysctl is unavailable.
+    static func level() -> Int {
+        var value: Int32 = 0
+        var size = MemoryLayout<Int32>.size
+        guard sysctlbyname("kern.memorystatus_vm_pressure_level", &value, &size, nil, 0) == 0,
+              value > 0 else { return normal }
+        return Int(value)
+    }
 }
 
 // MARK: - Renderer
@@ -321,6 +344,17 @@ enum MenuBarRenderer {
         }
     }
 
+    /// "By pressure" colour — the discrete macOS memory-pressure level (not a
+    /// percentage): normal → green, warning → orange, critical → red, matching
+    /// Activity Monitor's Memory Pressure graph.
+    private static func pressureColor(_ level: Int) -> NSColor {
+        switch level {
+        case MemoryPressure.critical: return NSColor(Brand.red)
+        case MemoryPressure.warning:  return NSColor(Brand.orange)
+        default:                      return NSColor(Brand.green)
+        }
+    }
+
     /// Battery is inverse: low charge is the alarming end.
     private static func batteryColor(_ pct: Double, charging: Bool) -> NSColor {
         if charging { return NSColor(Brand.green) }
@@ -336,7 +370,13 @@ enum MenuBarRenderer {
         switch item.color {
         case .mono:    return .labelColor
         case .accent:  return NSColor(Brand.blue)
-        case .pressure, .utilization:
+        case .pressure:
+            // "By pressure" = the real macOS memory-pressure level, not a load
+            // percentage. Only memory carries a pressure signal; other metrics
+            // fall back to value-driven colouring.
+            if item.metric == .memory { return pressureColor(values.memoryPressureLevel) }
+            fallthrough
+        case .utilization:
             if item.metric == .battery { return batteryColor(value, charging: values.batteryCharging) }
             if item.metric.isPercentage { return utilization(value) }
             return NSColor(Brand.blue)
