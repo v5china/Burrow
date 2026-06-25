@@ -201,10 +201,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         v.histories[.memory] = menuBarHistory[.memory]
         v.histories[.gpu]    = menuBarHistory[.gpu]
         v.histories[.power]  = menuBarHistory[.power]
-        // Memory-pressure level for the "By pressure" colour mode — from the
-        // engine's reported pressure, the same signal the dashboard/popover
-        // memory tiles use, so they all agree (falls back to the native sysctl).
-        v.memoryPressureLevel = MemoryPressure.levelForString(live.lastSnapshot?.memory.pressure ?? "")
+        // Native macOS memory-pressure level for the "By pressure" colour — the
+        // engine's snapshot pressure string is empty on Apple Silicon, so the
+        // sysctl is the real signal (and the tiles read the same `level()`).
+        v.memoryPressureLevel = MemoryPressure.level()
         return v
     }
 

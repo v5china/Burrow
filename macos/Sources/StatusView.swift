@@ -107,14 +107,13 @@ struct StatusView: View {
 
     private func memTile(_ s: MoleStatus) -> ValueTile {
         let m = s.memory
-        let label = m.pressure.isEmpty ? "normal" : m.pressure.lowercased()
-        let color: Color = label == "normal" ? Brand.textSecondary : (label == "warning" ? Brand.orange : Brand.red)
+        let lvl = MemoryPressure.level()
         let used = Fmt.gib(m.used)
         let total = Fmt.gib(m.total)
         return ValueTile(
-            eyebrow: "Memory", glyph: "memorychip", accent: MemoryPressure.tint(m.pressure),
+            eyebrow: "Memory", glyph: "memorychip", accent: MemoryPressure.tint(level: lvl),
             value: String(format: "%.0f", m.usedPercent), unit: "%",
-            chip: (label, color), values: model.memHist, chartStyle: .area,
+            chip: (MemoryPressure.label(level: lvl), MemoryPressure.tint(level: lvl)), values: model.memHist, chartStyle: .area,
             footnote: String(format: NSLocalizedString("%.1f / %.1f GB · swap %.1f GB", comment: ""),
                              used, total, Fmt.gib(m.swapUsed)))
     }

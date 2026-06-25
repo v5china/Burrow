@@ -285,7 +285,7 @@ struct PopupView: View {
                           footnote: (s.gpu?.first?.name ?? "GPU").replacingOccurrences(of: "Apple ", with: ""))
             }
             if tiles.contains(.memory) {
-                ValueTile(variant: .hud, eyebrow: "Memory", glyph: "memorychip", accent: MemoryPressure.tint(s.memory.pressure),
+                ValueTile(variant: .hud, eyebrow: "Memory", glyph: "memorychip", accent: MemoryPressure.tint(level: MemoryPressure.level()),
                           value: String(format: "%.0f", s.memory.usedPercent), unit: "%",
                           chip: memChip(s),
                           values: model.memHist, chartStyle: .area,
@@ -363,10 +363,8 @@ struct PopupView: View {
     }
 
     private func memChip(_ s: MoleStatus) -> (String, Color)? {
-        let label = s.memory.pressure.isEmpty ? "" : s.memory.pressure.lowercased()
-        guard !label.isEmpty else { return nil }
-        let color: Color = label == "normal" ? Brand.textSecondary : (label == "warning" ? Brand.orange : Brand.red)
-        return (label, color)
+        let lvl = MemoryPressure.level()
+        return (MemoryPressure.label(level: lvl), MemoryPressure.tint(level: lvl))
     }
 
     private func netValue(_ s: MoleStatus) -> (String, String) {

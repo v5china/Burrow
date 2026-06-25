@@ -315,22 +315,23 @@ enum MemoryPressure {
     /// signal as the menu-bar "By pressure" mode, so the Status + popover memory
     /// tiles read by actual pressure (calm even at high usedPercent) instead of
     /// a fixed colour. normal → green, warning → orange, critical → red.
-    static func tint(_ pressureString: String) -> Color {
-        let p = pressureString.lowercased()
-        if p.contains("crit") { return Brand.red }
-        if p.contains("warn") { return Brand.orange }
-        return Brand.green
+    /// Brand tint for a pressure LEVEL — normal → green, warning → orange,
+    /// critical → red. The engine's snapshot pressure string is empty on Apple
+    /// Silicon, so the native `level()` sysctl is the real signal used everywhere.
+    static func tint(level: Int) -> Color {
+        switch level {
+        case critical: return Brand.red
+        case warning:  return Brand.orange
+        default:       return Brand.green
+        }
     }
 
-    /// Map the engine's pressure STRING to a level int (for the menu-bar "By
-    /// pressure" colour), so the menu bar agrees with the dashboard/popover
-    /// tiles. Empty string ⇒ fall back to the native sysctl.
-    static func levelForString(_ s: String) -> Int {
-        let p = s.lowercased()
-        if p.contains("crit") { return critical }
-        if p.contains("warn") { return warning }
-        if p.isEmpty { return level() }
-        return normal
+    static func label(level: Int) -> String {
+        switch level {
+        case critical: return NSLocalizedString("critical", comment: "")
+        case warning:  return NSLocalizedString("warning", comment: "")
+        default:       return NSLocalizedString("normal", comment: "")
+        }
     }
 }
 
