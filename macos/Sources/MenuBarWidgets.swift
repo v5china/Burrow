@@ -288,41 +288,35 @@ struct MenuBarMetricValues {
     var batteryCharging = false
     /// Current macOS memory-pressure level (`kern.memorystatus_vm_pressure_level`):
     /// 1 = normal, 2 = warning, 4 = critical. Drives the "By pressure" colour.
-    var memoryPressureLevel: Int = MemoryPressure.normal
+    var memoryPressurePercent: Int = 0
 
     func has(_ m: MenuBarMetric) -> Bool { primary[m] != nil }
 }
 
-/// The current macOS memory-pressure level, read natively from
-/// `kern.memorystatus_vm_pressure_level` — the same signal Activity Monitor's
-/// Memory Pressure graph and `DISPATCH_SOURCE_TYPE_MEMORYPRESSURE` report. It's
-/// a discrete level, NOT a percentage.
+/// Memory pressure, expressed as a percentage and colour. macOS's own pressure
+/// signal (`kern.memorystatus_vm_pressure_level`) is a jumpy 3-level enum with
+/// no number, and mo's snapshot string is empty on Apple Silicon — so we report
+/// the VM compressor's share of RAM, which is stable and rises under pressure.
 enum MemoryPressure {
-    static let normal = 1, warning = 2, critical = 4
-
-    /// Point read of the current level — one cheap sysctl. Called on the
-    /// value-build pass, never on the draw path. Falls back to `normal` if the
-    /// sysctl is unavailable.
-    static func level() -> Int {
-        var value: Int32 = 0
-        var size = MemoryLayout<Int32>.size
-        guard sysctlbyname("kern.memorystatus_vm_pressure_level", &value, &size, nil, 0) == 0,
-              value > 0 else { return normal }
-        return Int(value)
+    /// Memory pressure as a percentage — the share of physical RAM the VM
+    /// compressor is holding, which rises as macOS compresses pages under
+    /// pressure. (mo's snapshot pressure string is empty on Apple Silicon, and
+    /// `kern.memorystatus_vm_pressure_level` is jumpy with no number, so this is
+    /// the stable signal shown everywhere.)
+    static func percent() -> Int {
+        var compressed: UInt64 = 0; var cSize = MemoryLayout<UInt64>.size
+        var total: UInt64 = 0; var tSize = MemoryLayout<UInt64>.size
+        guard sysctlbyname("vm.compressor_bytes_used", &compressed, &cSize, nil, 0) == 0,
+              sysctlbyname("hw.memsize", &total, &tSize, nil, 0) == 0, total > 0 else { return 0 }
+        return min(100, Int((Double(compressed) / Double(total) * 100).rounded()))
     }
 
-    /// Brand tint for mo's pressure STRING (normal/warning/critical) — the same
-    /// signal as the menu-bar "By pressure" mode, so the Status + popover memory
-    /// tiles read by actual pressure (calm even at high usedPercent) instead of
-    /// a fixed colour. normal → green, warning → orange, critical → red.
-    /// Brand tint for a pressure LEVEL — normal → green, warning → orange,
-    /// critical → red. The engine's snapshot pressure string is empty on Apple
-    /// Silicon, so the native `level()` sysctl is the real signal used everywhere.
-    static func tint(level: Int) -> Color {
-        switch level {
-        case critical: return Brand.red
-        case warning:  return Brand.orange
-        default:       return Brand.green
+    /// green ≤ 39 · orange 40–69 · red ≥ 70.
+    static func tint(percent: Int) -> Color {
+        switch percent {
+        case 70...: return Brand.red
+        case 40...: return Brand.orange
+        default:    return Brand.green
         }
     }
 }
@@ -379,12 +373,8 @@ enum MenuBarRenderer {
     /// "By pressure" colour — the discrete macOS memory-pressure level (not a
     /// percentage): normal → green, warning → orange, critical → red, matching
     /// Activity Monitor's Memory Pressure graph.
-    private static func pressureColor(_ level: Int) -> NSColor {
-        switch level {
-        case MemoryPressure.critical: return NSColor(Brand.red)
-        case MemoryPressure.warning:  return NSColor(Brand.orange)
-        default:                      return NSColor(Brand.green)
-        }
+    private static func pressureColor(_ percent: Int) -> NSColor {
+        NSColor(MemoryPressure.tint(percent: percent))
     }
 
     /// Battery is inverse: low charge is the alarming end.
@@ -419,7 +409,7 @@ enum MenuBarRenderer {
             // "By pressure" = the real macOS memory-pressure level, not a load
             // percentage. Only memory carries a pressure signal; other metrics
             // fall back to value-driven colouring.
-            if item.metric == .memory { return pressureColor(values.memoryPressureLevel) }
+            if item.metric == .memory { return pressureColor(values.memoryPressurePercent) }
             fallthrough
         case .utilization:
             if item.metric == .battery { return batteryColor(value, charging: values.batteryCharging) }

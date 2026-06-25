@@ -94,21 +94,21 @@ struct StatusView: View {
 
     private func memoryDetail(_ s: MoleStatus) -> some View {
         let m = s.memory
-        let lvl = MemoryPressure.level()
+        let lvl = MemoryPressure.percent()
         let free = m.available ?? (m.total > m.used ? m.total - m.used : 0)
         return HStack(alignment: .center, spacing: 22) {
             HStack(spacing: 6) {
-                Image(systemName: "memorychip").font(.system(size: 12)).foregroundStyle(MemoryPressure.tint(level: lvl))
+                Image(systemName: "memorychip").font(.system(size: 12)).foregroundStyle(MemoryPressure.tint(percent: lvl))
                 Text(NSLocalizedString("Memory", comment: "")).font(Brand.mono(10, .semibold)).foregroundStyle(Brand.textSecondary)
             }
-            memStat(NSLocalizedString("Used", comment: ""), String(format: "%.1f GB", Fmt.gib(m.used)), MemoryPressure.tint(level: lvl))
+            memStat(NSLocalizedString("Used", comment: ""), String(format: "%.1f GB", Fmt.gib(m.used)), MemoryPressure.tint(percent: lvl))
             memStat(NSLocalizedString("Free", comment: ""), String(format: "%.1f GB", Fmt.gib(free)), Brand.textPrimary)
             if let c = m.cached, c > 0 {
                 memStat(NSLocalizedString("Cached", comment: ""), String(format: "%.1f GB", Fmt.gib(c)), Brand.textPrimary)
             }
             memStat(NSLocalizedString("Swap", comment: ""),
                     String(format: "%.1f / %.0f GB", Fmt.gib(m.swapUsed), Fmt.gib(m.swapTotal)),
-                    m.swapUsed > 0 ? MemoryPressure.tint(level: lvl) : Brand.textPrimary)
+                    m.swapUsed > 0 ? MemoryPressure.tint(percent: lvl) : Brand.textPrimary)
             Spacer(minLength: 0)
         }
         .padding(14)
@@ -141,20 +141,15 @@ struct StatusView: View {
 
     private func memTile(_ s: MoleStatus) -> ValueTile {
         let m = s.memory
-        let lvl = MemoryPressure.level()
+        let lvl = MemoryPressure.percent()
         let used = Fmt.gib(m.used)
         let total = Fmt.gib(m.total)
-        // Concrete pressure info — swap in use — coloured by the pressure level,
-        // shown only when actually swapping (no chip at rest).
-        let chip: (String, Color)? = m.swapUsed > 0
-            ? (String(format: NSLocalizedString("swap %.1fG", comment: ""), Fmt.gib(m.swapUsed)),
-               MemoryPressure.tint(level: lvl))
-            : nil
         return ValueTile(
-            eyebrow: "Memory", glyph: "memorychip", accent: MemoryPressure.tint(level: lvl),
+            eyebrow: "Memory", glyph: "memorychip", accent: MemoryPressure.tint(percent: lvl),
             value: String(format: "%.0f", m.usedPercent), unit: "%",
-            chip: chip, values: model.memHist, chartStyle: .area,
-            footnote: String(format: NSLocalizedString("%.1f / %.1f GB used", comment: ""), used, total))
+            chip: (String(format: NSLocalizedString("%d%% pressure", comment: ""), lvl), MemoryPressure.tint(percent: lvl)),
+            values: model.memHist, chartStyle: .area,
+            footnote: String(format: NSLocalizedString("%.1f / %.1f GB · swap %.1f GB", comment: ""), used, total, Fmt.gib(m.swapUsed)))
     }
 
     private func gpuTile(_ s: MoleStatus) -> ValueTile {

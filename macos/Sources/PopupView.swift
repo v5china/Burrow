@@ -285,12 +285,12 @@ struct PopupView: View {
                           footnote: (s.gpu?.first?.name ?? "GPU").replacingOccurrences(of: "Apple ", with: ""))
             }
             if tiles.contains(.memory) {
-                ValueTile(variant: .hud, eyebrow: "Memory", glyph: "memorychip", accent: MemoryPressure.tint(level: MemoryPressure.level()),
+                ValueTile(variant: .hud, eyebrow: "Memory", glyph: "memorychip", accent: MemoryPressure.tint(percent: MemoryPressure.percent()),
                           value: String(format: "%.0f", s.memory.usedPercent), unit: "%",
                           chip: memChip(s),
                           values: model.memHist, chartStyle: .area,
-                          footnote: String(format: "%.1f/%.0f GB used",
-                                           Fmt.gib(s.memory.used), Fmt.gib(s.memory.total)))
+                          footnote: String(format: "%.1f/%.0f GB · swap %.1f GB",
+                                           Fmt.gib(s.memory.used), Fmt.gib(s.memory.total), Fmt.gib(s.memory.swapUsed)))
             }
             if tiles.contains(.diskUsage) { diskTile(s) }
             if tiles.contains(.network) {
@@ -363,9 +363,8 @@ struct PopupView: View {
     }
 
     private func memChip(_ s: MoleStatus) -> (String, Color)? {
-        guard s.memory.swapUsed > 0 else { return nil }   // concrete pressure info, only when swapping
-        return (String(format: NSLocalizedString("swap %.1fG", comment: ""), Fmt.gib(s.memory.swapUsed)),
-                MemoryPressure.tint(level: MemoryPressure.level()))
+        let p = MemoryPressure.percent()
+        return (String(format: NSLocalizedString("%d%% pressure", comment: ""), p), MemoryPressure.tint(percent: p))
     }
 
     private func netValue(_ s: MoleStatus) -> (String, String) {
