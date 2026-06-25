@@ -38,10 +38,16 @@ struct AppUpdateItem: Identifiable {
     var latestVersion: String?
     var pageURL: URL?
     var lastUsed: Date?
+    /// App Store: the macOS this update requires (from the iTunes lookup).
+    var minimumOS: String?
 
     var updateAvailable: Bool {
         guard let latest = latestVersion else { return false }
-        return UpdateCheck.isNewer(latest, than: installedVersion)
+        guard UpdateCheck.isNewer(latest, than: installedVersion) else { return false }
+        // Hide an App Store update that needs a newer macOS than we run (PRD §Software).
+        let v = Foundation.ProcessInfo.processInfo.operatingSystemVersion
+        let running = "\(v.majorVersion).\(v.minorVersion).\(v.patchVersion)"
+        return OSUpdateGate.isInstallable(minimumOS: minimumOS, running: running)
     }
 }
 
@@ -375,6 +381,7 @@ final class UpdatesModel: ObservableObject {
                   let lookup = UpdateSources.parseITunesLookup(data) else { return result }
             result.latestVersion = lookup.version
             result.pageURL = lookup.pageURL
+            result.minimumOS = lookup.minimumOsVersion
         case .electron, .homebrew:
             break   // v1: badge only; their own updaters handle it
         }
