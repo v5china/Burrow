@@ -325,14 +325,6 @@ enum MemoryPressure {
         default:       return Brand.green
         }
     }
-
-    static func label(level: Int) -> String {
-        switch level {
-        case critical: return NSLocalizedString("critical", comment: "")
-        case warning:  return NSLocalizedString("warning", comment: "")
-        default:       return NSLocalizedString("normal", comment: "")
-        }
-    }
 }
 
 // MARK: - Renderer
