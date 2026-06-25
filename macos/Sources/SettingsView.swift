@@ -697,7 +697,7 @@ struct SettingsView: View {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "Brewfile"
         panel.canCreateDirectories = true
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard CrashReporter.withoutAppHangTracking({ panel.runModal() }) == .OK, let url = panel.url else { return }
         brewBusy = true
         brewSnapshotStatus = NSLocalizedString("Exporting…", comment: "")
         Task {
@@ -719,7 +719,7 @@ struct SettingsView: View {
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard CrashReporter.withoutAppHangTracking({ panel.runModal() }) == .OK, let url = panel.url else { return }
         brewBusy = true
         brewSnapshotStatus = NSLocalizedString("Restoring — installing from your Brewfile can take a while…", comment: "")
         Task {
