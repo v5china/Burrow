@@ -24,7 +24,11 @@ Code, Cursor, Codex…) can ask "what's been happening on this machine."
 .NET 8 preview app, Windows telemetry/history, tray HUD, loopback HTTP, MCP
 stdio bridge, CI, tests, and unsigned release packaging.
 
-Mac: `brew install --cask caezium/tap/burrow`
+
+Mac:
+```sh
+brew install --cask caezium/tap/burrow
+```
 
 Windows: download from [releases](https://github.com/caezium/Burrow/releases/latest)
 
