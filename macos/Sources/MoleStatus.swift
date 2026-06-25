@@ -164,13 +164,15 @@ struct MemoryStatus: Codable, Equatable {
     /// actual JSON output (Go `omitempty` on a derived field). Treat it
     /// as opportunistic — fall back to `total - used` when missing.
     let available: UInt64?
+    /// Memory backing cached files — reclaimable, so not really "in use".
+    let cached: UInt64?
     let usedPercent: Double
     let swapUsed: UInt64
     let swapTotal: UInt64
     let pressure: String
 
     private enum CodingKeys: String, CodingKey {
-        case used, total, available
+        case used, total, available, cached
         case usedPercent = "used_percent"
         case swapUsed = "swap_used"
         case swapTotal = "swap_total"

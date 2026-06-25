@@ -51,6 +51,7 @@ struct StatusView: View {
                             .frame(minHeight: row2H)
                         fanTile(s).frame(minHeight: row2H)
                     }
+                    memoryDetail(s)
                     // Battery card carries the ring gauges (Mac + connected
                     // Bluetooth devices) — the old standalone BT strip folded in.
                     BatteryCard(s: s, minHeight: row2H)
@@ -87,6 +88,39 @@ struct StatusView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Memory detail (the full breakdown the small tile can't show)
+
+    private func memoryDetail(_ s: MoleStatus) -> some View {
+        let m = s.memory
+        let lvl = MemoryPressure.level()
+        let free = m.available ?? (m.total > m.used ? m.total - m.used : 0)
+        return HStack(alignment: .center, spacing: 22) {
+            HStack(spacing: 6) {
+                Image(systemName: "memorychip").font(.system(size: 12)).foregroundStyle(MemoryPressure.tint(level: lvl))
+                Text(NSLocalizedString("Memory", comment: "")).font(Brand.mono(10, .semibold)).foregroundStyle(Brand.textSecondary)
+            }
+            memStat(NSLocalizedString("Used", comment: ""), String(format: "%.1f GB", Fmt.gib(m.used)), MemoryPressure.tint(level: lvl))
+            memStat(NSLocalizedString("Free", comment: ""), String(format: "%.1f GB", Fmt.gib(free)), Brand.textPrimary)
+            if let c = m.cached, c > 0 {
+                memStat(NSLocalizedString("Cached", comment: ""), String(format: "%.1f GB", Fmt.gib(c)), Brand.textPrimary)
+            }
+            memStat(NSLocalizedString("Swap", comment: ""),
+                    String(format: "%.1f / %.0f GB", Fmt.gib(m.swapUsed), Fmt.gib(m.swapTotal)),
+                    m.swapUsed > 0 ? MemoryPressure.tint(level: lvl) : Brand.textPrimary)
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Brand.cardFill))
+    }
+
+    private func memStat(_ label: String, _ value: String, _ valueColor: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label).font(Brand.mono(9)).foregroundStyle(Brand.textTertiary)
+            Text(value).font(Brand.mono(13, .semibold)).foregroundStyle(valueColor)
+        }
     }
 
     // MARK: - Tiles built from the snapshot
