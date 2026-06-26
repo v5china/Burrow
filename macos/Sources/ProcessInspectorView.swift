@@ -26,6 +26,9 @@ struct ProcessInspectorView: View {
     /// The current process set — the parent-chain map ProcessOrigin walks.
     let processes: [ProcessInfo]
     @Environment(\.dismiss) private var dismiss
+    /// Per-process bandwidth (nettop, ~1s) — measured on demand, off-main.
+    @State private var net: NetUsage.Rates?
+    @State private var measuringNet = true
 
     private var table: [Int: ProcessOrigin.Info] {
         Dictionary(processes.map { ($0.pid, ProcessOrigin.Info(name: $0.name, ppid: $0.ppid ?? 0)) },
@@ -70,6 +73,7 @@ struct ProcessInspectorView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 field("CPU", String(format: "%.1f%%", proc.cpu), glyph: "cpu", tint: Brand.textSecondary)
+                field("NETWORK", netText, glyph: "network", tint: Brand.textSecondary)
             }
 
             HStack {
@@ -84,6 +88,19 @@ struct ProcessInspectorView: View {
         }
         .padding(20)
         .frame(width: 460)
+        .task {
+            let pid = proc.pid
+            let r = await Task.detached(priority: .utility) { NetUsage.sample()[pid] }.value
+            net = r
+            measuringNet = false
+        }
+    }
+
+    private var netText: String {
+        if measuringNet { return NSLocalizedString("Measuring…", comment: "") }
+        guard let net, net.down > 0 || net.up > 0 else { return NSLocalizedString("Idle", comment: "") }
+        return String(format: NSLocalizedString("↓ %@/s   ↑ %@/s", comment: ""),
+                      Fmt.bytes(net.down), Fmt.bytes(net.up))
     }
 
     private func field(_ label: String, _ value: String, glyph: String, tint: Color, mono: Bool = false) -> some View {
