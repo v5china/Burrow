@@ -93,6 +93,7 @@ struct UpdatesView: View {
             PillButton(title: model.checked ? "Check again" : "Check for updates", filled: !model.checked) {
                 model.checkNow()
             }
+            .keyboardShortcut("r", modifiers: .command)
             if model.checked, !model.brewItems.isEmpty {
                 PillButton(title: model.upgrading.isEmpty ? "Update all brews" : "Updating…", filled: false) {
                     model.upgradeAll()
@@ -391,6 +392,7 @@ final class UpdatesModel: ObservableObject {
     private static func fetch(_ url: URL) async -> Data? {
         var request = URLRequest(url: url)
         request.timeoutInterval = 10
+        request.cachePolicy = .reloadIgnoringLocalCacheData   // manual check = fresh metadata (PRD §Software)
         return try? await URLSession.shared.data(for: request).0
     }
 

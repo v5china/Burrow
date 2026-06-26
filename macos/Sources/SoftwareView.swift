@@ -536,7 +536,12 @@ final class SoftwareModel: ObservableObject {
 
     var filtered: [InstalledApp] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
-        let base = q.isEmpty ? apps : apps.filter { (loweredNames[$0.id] ?? $0.name.lowercased()).contains(q) }
+        // Alias-aware: also match bundle id + the engine's uninstall name (PRD §Uninstall).
+        let base = q.isEmpty ? apps : apps.filter {
+            (loweredNames[$0.id] ?? $0.name.lowercased()).contains(q)
+                || $0.bundleId.lowercased().contains(q)
+                || $0.uninstallName.lowercased().contains(q)
+        }
         let sorted: [InstalledApp]
         switch sort {
         case .size:   sorted = base.sorted { $0.sizeBytes > $1.sizeBytes }
