@@ -104,6 +104,13 @@ enum Store {
         set { write(newValue, "auto_vacuum") }
     }
 
+    /// Keep Screen On also prevents system sleep (survives a closed lid). Off by
+    /// default — it changes power behaviour (PRD §Everyday).
+    static var keepAwakeLidClosed: Bool {
+        get { d.object(forKey: "keep_awake_lid_closed") as? Bool ?? false }
+        set { write(newValue, "keep_awake_lid_closed") }
+    }
+
     // MARK: - Menu bar
 
     /// Whether to install the menu-bar status item (issue #4). On by

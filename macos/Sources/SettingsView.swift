@@ -86,6 +86,7 @@ struct SettingsView: View {
     @State private var popupTiles: Set<MenuBarMetric> = Store.popupTiles
     @State private var runnerConfig: RunnerConfig = Store.runnerConfig
     @State private var inputLock: Bool = Store.cleanScreenInputLock
+    @State private var keepAwakeLidClosed: Bool = Store.keepAwakeLidClosed
     @State private var axTrusted = CleanScreen.inputLockPermitted()
 
     // Advanced
@@ -465,6 +466,13 @@ struct SettingsView: View {
                 shortcutRow("Keep Screen On", action: .keepScreenOn)
                 shortcutRow("Clean Screen", action: .cleanScreen)
                 footnote("System-wide. Click a chip, press a combination with ⌃, ⌥ or ⌘; Esc cancels, × clears.")
+            }
+
+            section("Keep Screen On", "sun.max") {
+                toggleRow("Also keep working with the lid closed", isOn: $keepAwakeLidClosed) { on in
+                    Store.keepAwakeLidClosed = on
+                }
+                footnote("Adds a stronger sleep assertion so a backup or render survives shutting the lid. Off by default — it changes power behaviour; best on AC power. Takes effect next time you start Keep Screen On.")
             }
 
             section("Clean Screen", "rectangle.inset.filled") {

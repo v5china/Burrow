@@ -192,7 +192,17 @@ struct TreemapView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let shown = Array(entries.filter { $0.size > 0 }.prefix(120))
+            // Largest 120 cells; the long tail folds into one inert "Other"
+            // cell so the map stays legible AND its total matches (PRD §Analyze).
+            let shown: [DiskScanEntry] = {
+                let sorted = entries.filter { $0.size > 0 }.sorted { $0.size > $1.size }
+                guard sorted.count > 120 else { return sorted }
+                let tail = sorted.dropFirst(120).reduce(Int64(0)) { $0 + $1.size }
+                return Array(sorted.prefix(120)) + (tail > 0
+                    ? [DiskScanEntry(id: "__other__", name: NSLocalizedString("Other", comment: ""),
+                                     path: "", size: tail, isDir: false, lastAccess: nil)]
+                    : [])
+            }()
             let rects = Treemap.layout(weights: shown.map { Double($0.size) },
                                        in: CGRect(x: 0, y: 0, width: geo.size.width, height: geo.size.height))
             // One immediate-mode draw pass, not 120 nested SwiftUI cells. The
