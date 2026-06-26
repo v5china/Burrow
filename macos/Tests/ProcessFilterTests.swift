@@ -21,4 +21,41 @@ final class ProcessFilterTests: XCTestCase {
         let p = ProcessFilter.Predicate(field: .memory, op: .ge, value: "\(1 << 30)")
         XCTAssertEqual(ProcessFilter.apply(records, p).map(\.pid), [1])
     }
+
+    // MARK: - parse
+
+    func testParse_numericPredicate() {
+        let p = ProcessFilter.parse("cpu > 50")
+        XCTAssertEqual(p?.field, .cpu)
+        XCTAssertEqual(p?.op, .gt)
+        XCTAssertEqual(p?.value, "50")
+        XCTAssertEqual(ProcessFilter.apply(records, p!).map(\.pid), [1])
+    }
+
+    func testParse_multiCharOperatorBeatsPrefix() {
+        // ">=" must win over ">", else value becomes "= 90".
+        let p = ProcessFilter.parse("cpu >= 90")
+        XCTAssertEqual(p?.op, .ge)
+        XCTAssertEqual(p?.value, "90")
+    }
+
+    func testParse_memAliasAndNoSpaces() {
+        let p = ProcessFilter.parse("mem>=1073741824")
+        XCTAssertEqual(p?.field, .memory)
+        XCTAssertEqual(p?.op, .ge)
+        XCTAssertEqual(ProcessFilter.apply(records, p!).map(\.pid), [1])
+    }
+
+    func testParse_bareTermIsNameContains() {
+        let p = ProcessFilter.parse("find")
+        XCTAssertEqual(p?.field, .name)
+        XCTAssertEqual(p?.op, .contains)
+        XCTAssertEqual(ProcessFilter.apply(records, p!).map(\.pid), [2])
+    }
+
+    func testParse_emptyAndUnknownField() {
+        XCTAssertNil(ProcessFilter.parse("   "))
+        XCTAssertNil(ProcessFilter.parse("bogus > 1"))
+        XCTAssertNil(ProcessFilter.parse("cpu >"))   // missing value
+    }
 }

@@ -48,4 +48,33 @@ enum ProcessFilter {
     static func apply(_ records: [Record], _ p: Predicate) -> [Record] {
         records.filter { matches($0, p) }
     }
+
+    /// Parse a filter expression: "cpu > 20", "mem >= 1e8", "name ~ chrome",
+    /// "pid == 1". A bare term with no operator is a name-contains filter
+    /// ("chrome" → name ~ chrome). "mem" aliases "memory". nil for empty input
+    /// or an unknown field. Multi-char operators are matched before their
+    /// single-char prefixes so ">=" wins over ">".
+    static func parse(_ raw: String) -> Predicate? {
+        let s = raw.trimmingCharacters(in: .whitespaces)
+        guard !s.isEmpty else { return nil }
+        for op in [Op.ge, .le, .eq, .gt, .lt, .contains] {
+            guard let r = s.range(of: op.rawValue) else { continue }
+            let fieldStr = s[..<r.lowerBound].trimmingCharacters(in: .whitespaces).lowercased()
+            let value = String(s[r.upperBound...]).trimmingCharacters(in: .whitespaces)
+            guard let field = field(fieldStr), !value.isEmpty else { return nil }
+            return Predicate(field: field, op: op, value: value)
+        }
+        return Predicate(field: .name, op: .contains, value: s)   // bare term → name contains
+    }
+
+    private static func field(_ s: String) -> Field? {
+        switch s {
+        case "cpu":                return .cpu
+        case "mem", "memory":      return .memory
+        case "thread", "threads":  return .threads
+        case "name":               return .name
+        case "pid":                return .pid
+        default:                   return nil
+        }
+    }
 }

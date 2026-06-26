@@ -590,6 +590,8 @@ struct ProcessCard: View {
         let hidden = all.count - rows.count
         return GlassCard(padding: 0) {
             VStack(spacing: 0) {
+                filterBar
+                Rectangle().fill(Brand.hairline).frame(height: 1)
                 header(count: all.count)
                 Rectangle().fill(Brand.hairline).frame(height: 1)
                 // The table scrolls on its own, under a sticky header,
@@ -628,6 +630,28 @@ struct ProcessCard: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(NSLocalizedString("Show all processes", comment: ""))
+    }
+
+    /// Typed filter bar (PRD §α): "cpu > 20", "name ~ chrome", or a bare term
+    /// for name-contains. Recomputes the sorted rows as you type.
+    private var filterBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "line.3.horizontal.decrease.circle")
+                .font(.system(size: 11)).foregroundStyle(Brand.textTertiary)
+            TextField(NSLocalizedString("Filter — e.g. cpu > 20, name ~ chrome", comment: ""),
+                      text: Binding(get: { model.filterText }, set: { model.setFilter($0) }))
+                .textFieldStyle(.plain)
+                .font(Brand.mono(11)).foregroundStyle(Brand.textPrimary)
+            if !model.filterText.isEmpty {
+                Button { model.setFilter("") } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11)).foregroundStyle(Brand.textTertiary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(NSLocalizedString("Clear filter", comment: ""))
+            }
+        }
+        .padding(.horizontal, 14).padding(.vertical, 7)
     }
 
     private func header(count: Int) -> some View {
@@ -953,6 +977,9 @@ final class StatusModel: ObservableObject {
     /// re-evaluates `ProcessCard.body` no longer re-sorts hundreds of rows
     /// on the main thread (Sentry BURROW-1 / BURROW-N App Hang).
     @Published var sortedRows: [ProcessInfo] = []
+    /// Typed predicate filter over the table (PRD §α), e.g. "cpu > 20" or
+    /// "name ~ chrome". Empty = no filter. Parsed once per change, not per row.
+    @Published var filterText: String = ""
 
     let db: DB
     private let live: LiveFeed
@@ -1043,13 +1070,26 @@ final class StatusModel: ObservableObject {
         recomputeSortedRows()
     }
 
+    func setFilter(_ text: String) {
+        guard text != filterText else { return }
+        filterText = text
+        recomputeSortedRows()
+    }
+
     /// Re-sort the table from the current inputs and publish the result into
     /// `sortedRows`. O(n log n) over a few hundred rows, but run once per
     /// real change instead of once per `ProcessCard.body` evaluation — the
     /// body now just reads the cached array. Must run on the main actor (it
     /// mutates a `@Published`); every caller already does.
     func recomputeSortedRows() {
-        let procs = processes.isEmpty ? (snap?.topProcesses ?? []) : processes
+        var procs = processes.isEmpty ? (snap?.topProcesses ?? []) : processes
+        if let pred = ProcessFilter.parse(filterText) {
+            procs = procs.filter {
+                ProcessFilter.matches(ProcessFilter.Record(
+                    pid: $0.pid, name: $0.name, cpu: $0.cpu,
+                    memBytes: Int64($0.memoryBytes ?? 0), threads: 0), pred)
+            }
+        }
         let sorted = procs.sorted { a, b in
             switch sortKey {
             case .name: return sortAsc ? a.name < b.name : a.name > b.name
