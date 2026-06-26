@@ -27,6 +27,11 @@ struct ConnectivityView: View {
     @State private var actionResult: String?
     /// Venue-specific captive-portal tips when the SSID is recognised (PRD §β).
     @State private var venue: VenueMatcher.Venue?
+    /// On-demand nearby-Wi-Fi scan (PRD §β Home mode): strongest networks +
+    /// congested channels. User-initiated — a scan briefly disrupts the link.
+    @State private var nearby: [NearbyNetworks.Net] = []
+    @State private var scanning = false
+    @State private var scanned = false
 
     private var accent: Color { Tool.status.accent }
 
@@ -41,6 +46,7 @@ struct ConnectivityView: View {
                     Text(NSLocalizedString("Couldn't run the checks.", comment: ""))
                         .font(Brand.sans(13)).foregroundStyle(Brand.textSecondary)
                 }
+                nearbyCard
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -144,6 +150,78 @@ struct ConnectivityView: View {
     /// stays hidden. Off-main: CoreWLAN reads can block.
     private static func currentSSID() -> String? {
         CWWiFiClient.shared().interface()?.ssid()
+    }
+
+    /// Nearby-Wi-Fi card (PRD §β Home mode): strongest networks with their
+    /// channel, plus a "busy ch" marker for congested channels.
+    private var nearbyCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Eyebrow(text: "Nearby Wi-Fi", glyph: "dot.radiowaves.left.and.right", color: accent)
+                    Spacer()
+                    if scanning {
+                        ProgressView().controlSize(.small).tint(accent)
+                    } else {
+                        Button(scanned ? NSLocalizedString("Rescan", comment: "")
+                                       : NSLocalizedString("Scan", comment: "")) { scanNearby() }
+                            .buttonStyle(.plain).font(Brand.sans(11, .semibold)).foregroundStyle(accent)
+                    }
+                }
+                if !nearby.isEmpty {
+                    let congested = NearbyNetworks.congestedChannels(nearby)
+                    let strongest = Array(NearbyNetworks.byStrength(nearby).prefix(8))
+                    ForEach(Array(strongest.enumerated()), id: \.offset) { _, n in
+                        HStack(spacing: 8) {
+                            Image(systemName: n.security == "Open" ? "lock.open" : "lock")
+                                .font(.system(size: 9)).foregroundStyle(Brand.textTertiary)
+                            Text(n.ssid).font(Brand.sans(12)).foregroundStyle(Brand.textPrimary).lineLimit(1)
+                            Spacer(minLength: 8)
+                            if congested.contains(n.channel) {
+                                Text(NSLocalizedString("busy", comment: ""))
+                                    .font(Brand.mono(9)).foregroundStyle(Brand.amber)
+                            }
+                            Text(verbatim: "ch \(n.channel)").font(Brand.mono(10)).foregroundStyle(Brand.textTertiary)
+                            Text(verbatim: "\(n.rssi) dBm").font(Brand.mono(10))
+                                .foregroundStyle(Brand.textSecondary).frame(width: 64, alignment: .trailing)
+                        }
+                    }
+                } else if scanned, !scanning {
+                    Text(NSLocalizedString("No networks found — scanning needs Location access (System Settings ▸ Privacy & Security ▸ Location).", comment: ""))
+                        .font(Brand.mono(10)).foregroundStyle(Brand.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if !scanned {
+                    Text(NSLocalizedString("See which channels are crowded near you.", comment: ""))
+                        .font(Brand.sans(12)).foregroundStyle(Brand.textSecondary)
+                }
+            }
+        }
+    }
+
+    private func scanNearby() {
+        scanning = true
+        Task.detached(priority: .utility) {
+            let nets = ConnectivityView.scanNearbyNetworks()
+            await MainActor.run {
+                nearby = nets
+                scanning = false
+                scanned = true
+            }
+        }
+    }
+
+    /// Active scan via CoreWLAN. Throws/empty without Location access or off
+    /// Wi-Fi → the card shows the permission hint. A scan briefly disrupts the
+    /// link, so it's only ever user-initiated.
+    private static func scanNearbyNetworks() -> [NearbyNetworks.Net] {
+        guard let iface = CWWiFiClient.shared().interface() else { return [] }
+        let nets = (try? iface.scanForNetworks(withSSID: nil)) ?? []
+        return nets.compactMap { n in
+            guard let ssid = n.ssid, !ssid.isEmpty else { return nil }
+            return NearbyNetworks.Net(ssid: ssid, rssi: n.rssiValue,
+                                      channel: n.wlanChannel?.channelNumber ?? 0,
+                                      security: n.supportsSecurity(.none) ? "Open" : "Secured")
+        }
     }
 
     private func checkRow(_ c: Connectivity.Check) -> some View {
