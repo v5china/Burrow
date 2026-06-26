@@ -29,6 +29,8 @@ struct ProcessInspectorView: View {
     /// Per-process bandwidth (nettop, ~1s) — measured on demand, off-main.
     @State private var net: NetUsage.Rates?
     @State private var measuringNet = true
+    /// Deep metrics (threads/memory/disk/CPU split) — fast syscall on appear.
+    @State private var deep: ProcessDeepMetrics.Metrics?
 
     private var table: [Int: ProcessOrigin.Info] {
         Dictionary(processes.map { ($0.pid, ProcessOrigin.Info(name: $0.name, ppid: $0.ppid ?? 0)) },
@@ -74,6 +76,14 @@ struct ProcessInspectorView: View {
                 }
                 field("CPU", String(format: "%.1f%%", proc.cpu), glyph: "cpu", tint: Brand.textSecondary)
                 field("NETWORK", netText, glyph: "network", tint: Brand.textSecondary)
+                if let deep {
+                    field("MEMORY", "\(Fmt.bytes(deep.footprintBytes)) · peak \(Fmt.bytes(deep.peakFootprintBytes))",
+                          glyph: "memorychip", tint: Brand.textSecondary)
+                    field("THREADS", "\(deep.threads)", glyph: "square.stack.3d.up", tint: Brand.textSecondary)
+                    field("DISK I/O", "\(Fmt.bytes(deep.diskReadBytes)) read · \(Fmt.bytes(deep.diskWriteBytes)) written",
+                          glyph: "internaldrive", tint: Brand.textSecondary)
+                    field("CPU TIME", cpuTimeText(deep), glyph: "clock", tint: Brand.textSecondary)
+                }
             }
 
             HStack {
@@ -90,10 +100,20 @@ struct ProcessInspectorView: View {
         .frame(width: 460)
         .task {
             let pid = proc.pid
+            deep = ProcessDeepMetrics.read(pid: pid)   // fast syscall
             let r = await Task.detached(priority: .utility) { NetUsage.sample()[pid] }.value
             net = r
             measuringNet = false
         }
+    }
+
+    private func cpuTimeText(_ d: ProcessDeepMetrics.Metrics) -> String {
+        let total = d.userSeconds + d.systemSeconds
+        guard let frac = ProcessDeepMetrics.userFraction(userSeconds: d.userSeconds, systemSeconds: d.systemSeconds) else {
+            return String(format: NSLocalizedString("%.1fs total", comment: ""), total)
+        }
+        return String(format: NSLocalizedString("%.1fs · %.0f%% user / %.0f%% system", comment: ""),
+                      total, frac * 100, (1 - frac) * 100)
     }
 
     private var netText: String {
