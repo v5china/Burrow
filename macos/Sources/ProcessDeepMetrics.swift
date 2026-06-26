@@ -21,6 +21,8 @@ enum ProcessDeepMetrics {
         let systemSeconds: Double
         let diskReadBytes: Int64
         let diskWriteBytes: Int64
+        /// Wall-clock seconds since the process started (0 when unknown).
+        let runtimeSeconds: Double
     }
 
     /// Live deep metrics for a pid. nil when the kernel won't report (permission
@@ -38,6 +40,16 @@ enum ProcessDeepMetrics {
         let tiSize = Int32(MemoryLayout<proc_taskinfo>.size)
         let got = proc_pidinfo(Int32(pid), PROC_PIDTASKINFO, 0, &ti, tiSize)
         let threads = got == tiSize ? Int(ti.pti_threadnum) : 0
+
+        // Runtime = (now − start) in mach units → seconds.
+        var tb = mach_timebase_info_data_t()
+        mach_timebase_info(&tb)
+        let now = mach_absolute_time()
+        let startAbs = usage.ri_proc_start_abstime
+        let runtime = (startAbs > 0 && now > startAbs && tb.denom > 0)
+            ? Double(now - startAbs) * Double(tb.numer) / Double(tb.denom) / 1_000_000_000
+            : 0
+
         return Metrics(
             threads: threads,
             footprintBytes: Int64(bitPattern: usage.ri_phys_footprint),
@@ -46,7 +58,8 @@ enum ProcessDeepMetrics {
             userSeconds: Double(usage.ri_user_time) / 1_000_000_000,
             systemSeconds: Double(usage.ri_system_time) / 1_000_000_000,
             diskReadBytes: Int64(bitPattern: usage.ri_diskio_bytesread),
-            diskWriteBytes: Int64(bitPattern: usage.ri_diskio_byteswritten))
+            diskWriteBytes: Int64(bitPattern: usage.ri_diskio_byteswritten),
+            runtimeSeconds: runtime)
     }
 
     /// User share of CPU time, 0…1 — nil when the process has used no CPU yet.
