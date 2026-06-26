@@ -1000,6 +1000,8 @@ final class StatusModel: ObservableObject {
     let db: DB
     private let live: LiveFeed
     private let feeds: FeedHub
+    /// Opt-in per-process CPU watchdog (PRD §α). Inert until enabled in Settings.
+    private let watchdog = ProcessWatchdog()
 
     init(db: DB, live: LiveFeed, feeds: FeedHub) {
         self.db = db
@@ -1072,6 +1074,10 @@ final class StatusModel: ObservableObject {
             processes = v.processes
             energies = v.energies
             recomputeSortedRows()
+            // Opt-in watchdog: evaluate this tick, dispatch any new firings.
+            for f in watchdog.step(processes: v.processes, cadenceSeconds: 2) {
+                watchdog.dispatch(pid: f.pid, name: f.name)
+            }
         }
     }
 
