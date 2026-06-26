@@ -167,6 +167,12 @@ struct AnalyzeView: View {
             }
             Spacer()
             Text(model.usageLine).font(Brand.mono(10)).foregroundStyle(Brand.textTertiary)
+            Button { model.scanWholeDisk() } label: {
+                Image(systemName: "externaldrive").font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(model.crumbs.first?.path == "/" ? Brand.textTertiary.opacity(0.35) : Brand.textSecondary)
+            }
+            .buttonStyle(.plain).disabled(model.crumbs.first?.path == "/")
+            .help(NSLocalizedString("Scan the whole disk", comment: ""))
             Button { model.refresh() } label: {
                 Image(systemName: "arrow.clockwise").font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Brand.textSecondary)
@@ -372,6 +378,14 @@ final class AnalyzeModel: ObservableObject {
         guard let last = crumbs.last else { return }
         cache[last.path] = nil   // drop the cached walk so we re-scan
         scan(last.path, name: last.name, push: false, force: true)
+    }
+
+    /// Re-root the scan at the whole disk (PRD §Analyze 38). Reachable by
+    /// climbing Up too, but this is the one-tap "show me everything" entry.
+    func scanWholeDisk() {
+        guard crumbs.first?.path != "/" else { return }
+        crumbs = []
+        scan("/", name: "/", push: true)
     }
 
     /// Whether there's a parent to climb to (Home isn't the ceiling — you can
