@@ -123,6 +123,7 @@ struct DoctorView: View {
         // froze the main thread long enough to trip Sentry's ≥2000ms App Hang
         // detector. Probe off the main thread, then publish on the main actor.
         let cpuLoad = latest?.cpu.usage
+        let battHealth: Int? = (latest?.batteries?.first?.capacity).flatMap { $0 > 0 ? $0 : nil }
         let probes = await Task.detached(priority: .utility) {
             (backup: BackupStatus.lastBackupDaysAgo(),
              smart: DiskHealth.smartVerified(),
@@ -140,6 +141,7 @@ struct DoctorView: View {
             smartVerified: probes.smart,
             sip: probes.sip, gatekeeper: probes.gatekeeper,
             fileVault: probes.fileVault, firewall: probes.firewall,
+            batteryHealthPct: battHealth,
             cpuLoadPercent: cpuLoad))
     }
 
