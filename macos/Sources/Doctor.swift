@@ -43,6 +43,10 @@ enum Doctor {
         var batteryHealthPct: Int? = nil
         /// System-wide CPU load %; nil = unknown → omitted.
         var cpuLoadPercent: Double? = nil
+        // Shared-report context (PRD §Doctor story 47). nil = unknown → omitted.
+        var displayCount: Int? = nil
+        var externalVolumeCount: Int? = nil
+        var networkInterface: String? = nil
     }
 
     /// One `Check` per facet, in a stable order. Each verdict is independent;
@@ -53,8 +57,27 @@ enum Doctor {
         if let s = security(i) { checks.append(s) }
         if let b = battery(i) { checks.append(b) }
         if let c = highCPU(i) { checks.append(c) }
+        if let d = displays(i) { checks.append(d) }
+        if let v = volumes(i) { checks.append(v) }
+        if let n = network(i) { checks.append(n) }
         checks.append(errors(i))
         return checks
+    }
+
+    private static func displays(_ i: Input) -> Check? {
+        guard let n = i.displayCount else { return nil }
+        return Check(name: "Displays", level: .ok, detail: n == 1 ? "1 display" : "\(n) displays")
+    }
+
+    private static func volumes(_ i: Input) -> Check? {
+        guard let n = i.externalVolumeCount else { return nil }
+        return Check(name: "External volumes", level: .ok,
+                     detail: n == 0 ? "none mounted" : "\(n) mounted")
+    }
+
+    private static func network(_ i: Input) -> Check? {
+        guard let iface = i.networkInterface, !iface.isEmpty else { return nil }
+        return Check(name: "Network", level: .ok, detail: "primary interface: \(iface)")
     }
 
     private static func security(_ i: Input) -> Check? {

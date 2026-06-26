@@ -124,13 +124,16 @@ struct DoctorView: View {
         // detector. Probe off the main thread, then publish on the main actor.
         let cpuLoad = latest?.cpu.usage
         let battHealth: Int? = (latest?.batteries?.first?.capacity).flatMap { $0 > 0 ? $0 : nil }
+        let displays = NSScreen.screens.count   // main-actor; reload is @MainActor
         let probes = await Task.detached(priority: .utility) {
             (backup: BackupStatus.lastBackupDaysAgo(),
              smart: DiskHealth.smartVerified(),
              sip: SecurityPosture.sip(DoctorView.run("/usr/bin/csrutil", ["status"])),
              gatekeeper: SecurityPosture.gatekeeper(DoctorView.run("/usr/sbin/spctl", ["--status"])),
              fileVault: SecurityPosture.fileVault(DoctorView.run("/usr/bin/fdesetup", ["status"])),
-             firewall: SecurityPosture.firewall(DoctorView.run("/usr/libexec/ApplicationFirewall/socketfilterfw", ["--getglobalstate"])))
+             firewall: SecurityPosture.firewall(DoctorView.run("/usr/libexec/ApplicationFirewall/socketfilterfw", ["--getglobalstate"])),
+             volumes: DoctorView.externalVolumeCount(),
+             iface: Connectivity.defaultRoute(fromRouteGet: DoctorView.run("/sbin/route", ["-n", "get", "default"])).interface)
         }.value
         checks = Doctor.report(.init(
             fullDiskAccess: fullDiskAccess,
@@ -142,7 +145,20 @@ struct DoctorView: View {
             sip: probes.sip, gatekeeper: probes.gatekeeper,
             fileVault: probes.fileVault, firewall: probes.firewall,
             batteryHealthPct: battHealth,
-            cpuLoadPercent: cpuLoad))
+            cpuLoadPercent: cpuLoad,
+            displayCount: displays,
+            externalVolumeCount: probes.volumes,
+            networkInterface: probes.iface))
+    }
+
+    /// Count of mounted non-internal (external/removable) volumes, for the
+    /// Doctor context line. Off-main (FileManager volume reads can touch disk).
+    private static func externalVolumeCount() -> Int {
+        let vols = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: [.volumeIsInternalKey],
+                                                         options: [.skipHiddenVolumes]) ?? []
+        return vols.filter {
+            (try? $0.resourceValues(forKeys: [.volumeIsInternalKey]).volumeIsInternal) == false
+        }.count
     }
 
     /// Capture a short system command's stdout (off-main; used for the security
