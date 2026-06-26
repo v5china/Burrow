@@ -874,7 +874,7 @@ final class StartupModel: ObservableObject {
     func reload() {
         loading = true
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let scanned = StartupInventory.scanLive()
+            let scanned = StartupInventory.scanLiveIncludingLoginItems()
             let disabled = StartupControl.disabledLabels()
             Task { @MainActor in
                 self?.items = scanned
