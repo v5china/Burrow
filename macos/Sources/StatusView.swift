@@ -638,10 +638,36 @@ struct ProcessCard: View {
             sortButton("CPU", .cpu).frame(width: 92, alignment: .trailing)
             sortButton("PWR", .pwr).frame(width: 44, alignment: .trailing)
             sortButton("MEM", .mem).frame(width: 64, alignment: .trailing)
-            Color.clear.frame(width: 20)   // the … column
+            exportMenu   // aligns with the per-row … column
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
+    }
+
+    /// Table-level export of the current (sorted) process set to the clipboard
+    /// (PRD §α Process Inspector). Threads aren't in the `ps` sample → 0.
+    private var exportMenu: some View {
+        Menu {
+            Button(NSLocalizedString("Copy as CSV", comment: "")) { copyExport(asCSV: true) }
+            Button(NSLocalizedString("Copy as JSON", comment: "")) { copyExport(asCSV: false) }
+        } label: {
+            Image(systemName: "square.and.arrow.up")
+                .font(.system(size: 10)).foregroundStyle(Brand.textTertiary)
+                .frame(width: 20, height: 20).contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 20)
+        .help(NSLocalizedString("Export the process list", comment: ""))
+        .accessibilityLabel(NSLocalizedString("Export the process list", comment: ""))
+    }
+
+    private func copyExport(asCSV: Bool) {
+        let rows = model.sortedRows.map {
+            ProcessExport.Row(pid: $0.pid, name: $0.name, cpu: $0.cpu,
+                              memBytes: Int64($0.memoryBytes ?? 0), threads: 0)
+        }
+        let text = asCSV ? ProcessExport.csv(rows) : ProcessExport.json(rows)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 
     private func sortButton(_ title: String, _ key: ProcSort) -> some View {
@@ -726,6 +752,8 @@ struct ProcRow: View {
         static let copyPID = NSLocalizedString("Copy PID", comment: "")
         static let quit = NSLocalizedString("Quit…", comment: "")
         static let forceKill = NSLocalizedString("Force Kill…", comment: "")
+        static let suspend = NSLocalizedString("Suspend", comment: "")
+        static let resume = NSLocalizedString("Resume", comment: "")
     }
 
     /// Per-row "…" menu: pin, reveal, copy; Quit / Force Kill for
@@ -748,6 +776,9 @@ struct ProcRow: View {
             }
             if ProcessActions.isOwnProcess(pid: p.pid) {
                 Divider()
+                // Suspend/Resume are reversible (SIGSTOP/SIGCONT) — no confirm.
+                Button(L.suspend) { ProcessActions.suspend(pid: p.pid) }
+                Button(L.resume) { ProcessActions.resume(pid: p.pid) }
                 Button(L.quit, role: .destructive) { confirmQuit(force: false) }
                 Button(L.forceKill, role: .destructive) { confirmQuit(force: true) }
             }
