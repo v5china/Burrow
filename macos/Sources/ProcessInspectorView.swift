@@ -33,6 +33,10 @@ struct ProcessInspectorView: View {
     @State private var sign: CodeSignInfo.Info?
     @State private var arch = ""
     @State private var path: String?
+    /// On-disk binary gone (deleted/replaced after launch). It's a `stat()`, so
+    /// it's resolved once in `load()` off-main rather than recomputed on every
+    /// body redraw the way a computed `fileExists` property would be.
+    @State private var binaryMissing = false
 
     private var accent: Color { Tool.status.accent }
 
@@ -43,7 +47,6 @@ struct ProcessInspectorView: View {
     private var origin: ProcessOrigin.Origin { ProcessOrigin.classify(pid: proc.pid, table: originTable) }
     private var parent: ProcessInfo? { proc.ppid.flatMap { ppid in processes.first { $0.pid == ppid } } }
     private var children: [ProcessInfo] { processes.filter { $0.ppid == proc.pid } }
-    private var binaryMissing: Bool { path.map { !FileManager.default.fileExists(atPath: $0) } ?? false }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -254,10 +257,15 @@ struct ProcessInspectorView: View {
         deep = ProcessDeepMetrics.read(pid: pid)
         let p = ProcessActions.executablePath(pid: pid)
         path = p
-        let (s, a): (CodeSignInfo.Info?, String) = await Task.detached(priority: .utility) {
-            (CodeSignInfo.read(pid: pid), p.map(MachOArch.label(path:)) ?? "")
+        // Fold the binary-exists stat() into the off-main block — the inspector
+        // body reads `binaryMissing` on every redraw, so a computed fileExists
+        // would be a syscall per render.
+        let (s, a, missing): (CodeSignInfo.Info?, String, Bool) = await Task.detached(priority: .utility) {
+            (CodeSignInfo.read(pid: pid),
+             p.map(MachOArch.label(path:)) ?? "",
+             p.map { !FileManager.default.fileExists(atPath: $0) } ?? false)
         }.value
-        sign = s; arch = a
+        sign = s; arch = a; binaryMissing = missing
         let r = await Task.detached(priority: .utility) { NetUsage.sample()[pid] }.value
         net = r; measuringNet = false
     }

@@ -542,21 +542,32 @@ final class SoftwareModel: ObservableObject {
     /// (`u_isUAlphabetic`, `icu::CharString::append`) per app per keystroke
     /// over a 100+ app list hung the main thread (Sentry App Hang). Folding
     /// once up front turns each keystroke into a plain substring scan.
+    /// `loweredNames` stays name-only for the Name sort; `loweredSearch` is the
+    /// name + bundle id + uninstall name haystack for alias-aware filtering —
+    /// folding those two extra fields per keystroke instead brought the App
+    /// Hang straight back.
     private var loweredNames: [String: String] = [:]
+    private var loweredSearch: [String: String] = [:]
 
     private func rebuildLoweredNames() {
-        var map = [String: String](minimumCapacity: apps.count)
-        for a in apps { map[a.id] = a.name.lowercased() }
-        loweredNames = map
+        var names = [String: String](minimumCapacity: apps.count)
+        var search = [String: String](minimumCapacity: apps.count)
+        for a in apps {
+            let name = a.name.lowercased()
+            names[a.id] = name
+            search[a.id] = "\(name) \(a.bundleId.lowercased()) \(a.uninstallName.lowercased())"
+        }
+        loweredNames = names
+        loweredSearch = search
     }
 
     var filtered: [InstalledApp] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
-        // Alias-aware: also match bundle id + the engine's uninstall name (PRD §Uninstall).
+        // Alias-aware (name + bundle id + uninstall name, PRD §Uninstall), but
+        // matched against the haystack pre-folded once per load — so a keystroke
+        // is one substring scan per app, not three ICU foldings.
         let base = q.isEmpty ? apps : apps.filter {
-            (loweredNames[$0.id] ?? $0.name.lowercased()).contains(q)
-                || $0.bundleId.lowercased().contains(q)
-                || $0.uninstallName.lowercased().contains(q)
+            (loweredSearch[$0.id] ?? $0.name.lowercased()).contains(q)
         }
         let sorted: [InstalledApp]
         switch sort {

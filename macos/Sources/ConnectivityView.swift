@@ -424,7 +424,13 @@ struct ConnectivityView: View {
             let online = result.checks.contains { $0.id == "internet" && $0.status == .ok }
             let portal = result.checks.contains { $0.id == "portal" }
             let reason = ConnectionFailureClassifier.classify(online: online, portal: portal, loginReachable: portal)
-            history = ConnectionHistory.record(ssid: ssid, reason: reason.rawValue, at: Date())
+            // record() reads + rewrites the UserDefaults JSON log — keep it off
+            // the main actor, like the SSID read above.
+            let reasonRaw = reason.rawValue
+            let at = Date()
+            history = await Task.detached(priority: .utility) {
+                ConnectionHistory.record(ssid: ssid, reason: reasonRaw, at: at)
+            }.value
         }
     }
 }
