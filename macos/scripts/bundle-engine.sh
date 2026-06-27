@@ -38,4 +38,12 @@ cp "$ENGINE_SRC/LICENSE" "$OUT/LICENSE"
 chmod +x "$OUT/mole" "$OUT/bin/"* 2>/dev/null || true
 [ -f "$OUT/mo" ] && chmod +x "$OUT/mo"
 
-echo "bundled engine -> $OUT ($(du -sh "$OUT" 2>/dev/null | awk '{print $1}'))"
+# 3. Code-sign the nested Mach-O binaries so the app's own signature validates (--deep).
+#    Uses the build's resolved identity when run as a build phase, else ad-hoc ('-').
+IDENTITY="${EXPANDED_CODE_SIGN_IDENTITY:--}"
+for b in status-go analyze-go; do
+  codesign --force --sign "$IDENTITY" --timestamp=none "$OUT/bin/$b" 2>/dev/null \
+    || codesign --force --sign - --timestamp=none "$OUT/bin/$b" || true
+done
+
+echo "bundled engine -> $OUT ($(du -sh "$OUT" 2>/dev/null | awk '{print $1}'); signed with '${IDENTITY}')"

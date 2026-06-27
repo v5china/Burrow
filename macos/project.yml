@@ -85,7 +85,7 @@ targets:
     dependencies:
       - package: PostHog
       - package: Sentry
-    postCompileScripts:
+    postBuildScripts:
       - name: Bundle burrow-engine (MIT)
         basedOnDependencyAnalysis: false
         script: |
@@ -93,6 +93,11 @@ targets:
           # install (never upstream GPL mo). Activates when the engine source is present —
           # a release/CI vendors it (vendor/burrow-engine) or sets BURROW_ENGINE_SRC; dev
           # builds without it fall back to a system-installed engine.
+          #
+          # NOTE: Xcode's CodeSign phase runs AFTER all build phases, so it re-signs the app
+          # over the freshly-added engine and the resource seal ends up stale. The final seal
+          # therefore happens POST-build: use scripts/build.sh locally, and the release
+          # pipeline's inside-out re-sign (#178) seals it for distribution.
           ENGINE_SRC="${BURROW_ENGINE_SRC:-$SRCROOT/vendor/burrow-engine}"
           if [ -d "$ENGINE_SRC" ]; then
             "$SRCROOT/scripts/bundle-engine.sh" "$ENGINE_SRC" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
