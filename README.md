@@ -13,17 +13,6 @@
 ![Windows 10/11 — beta](https://img.shields.io/badge/Windows-10%2F11%20·%20beta-blue)
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue)
 
-Burrow wraps the free, open-source Mole engine in a native desktop app: clean
-junk, purge dev artifacts, sweep leftover installers, uninstall apps, run safe
-maintenance, map your disk, and watch live system status — in one window. On top
-of that it adds things the CLI doesn't have: a **long-running history** of your
-machine's metrics in a local store and an **MCP server** so any AI agent (Claude
-Code, Cursor, Codex…) can ask "what's been happening on this machine."
-
-**macOS** is the mature flagship. **Windows** currently has a native WinUI 3 /
-.NET 8 preview app, Windows telemetry/history, tray HUD, loopback HTTP, MCP
-stdio bridge, CI, tests, and unsigned release packaging.
-
 
 Mac:
 ```sh
@@ -115,6 +104,18 @@ Windows: download from [releases](https://github.com/caezium/Burrow/releases/lat
 </table>
 
 ## The tools
+
+Burrow wraps the free, open-source Mole engine in a native desktop app: clean
+junk, purge dev artifacts, sweep leftover installers, uninstall apps, run safe
+maintenance, map your disk, and watch live system status — in one window. On top
+of that it adds things the CLI doesn't have: a **long-running history** of your
+machine's metrics in a local store and an **MCP server** so any AI agent (Claude
+Code, Cursor, Codex…) can ask "what's been happening on this machine."
+
+**macOS** is the mature flagship. **Windows** currently has a native WinUI 3 /
+.NET 8 preview app, Windows telemetry/history, tray HUD, loopback HTTP, MCP
+stdio bridge, CI, tests, and unsigned release packaging.
+
 
 | Tool | What it does | `mo` command |
 |---|---|---|
