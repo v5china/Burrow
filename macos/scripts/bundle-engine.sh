@@ -21,7 +21,7 @@ OUT="$RESOURCES/engine"
 #    it's too old, instead of auto-downloading a newer toolchain mid-build (that download
 #    hung the first 0.9.0 build); GIT_TERMINAL_PROMPT=0 + </dev/null prevent any wait on an
 #    interactive prompt. Release CI pins a Go >= go.mod's requirement via actions/setup-go.
-export GOTOOLCHAIN=local
+export GOTOOLCHAIN=auto
 export GIT_TERMINAL_PROMPT=0
 if command -v go >/dev/null 2>&1; then
   ( cd "$ENGINE_SRC" \

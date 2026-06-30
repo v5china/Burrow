@@ -75,14 +75,10 @@ jobs:
             echo "::warning::burrow-engine unavailable — set ENGINE_PAT or make it public. Shipping WITHOUT the bundled engine; app falls back to system \`mo\`."
           fi
 
-      # Pin a Go that satisfies the engine's go.mod (>= 1.25) so the bundle
-      # phase's `go build` uses it directly (bundle-engine.sh forces
-      # GOTOOLCHAIN=local). Harmless when the engine isn't fetched.
-      - name: Set up Go (for the bundled engine)
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
-        with:
-          go-version: "1.26"
-          cache: false
+      # [BISECT — TEMP] setup-go removed to test whether IT (not the out-of-tree
+      # engine fetch) triggers the SPM/Sentry hang. The runner's default Go
+      # builds the engine; bundle-engine.sh uses GOTOOLCHAIN=auto to grab a
+      # newer toolchain if the default is too old (fast, and after SPM).
 
       # Use the newest Xcode on the runner so xcodebuild can read the project
       # format xcodegen emits (Homebrew's xcodegen targets the latest Xcode).
@@ -108,7 +104,7 @@ jobs:
           # of hanging, and retry with a per-attempt time bound so a true network
           # stall is killed and re-attempted rather than eating the whole job.
           attempt_build() {
-            local secs=1080 rc
+            local secs=720 rc
             bash scripts/release.sh </dev/null &
             local pid=$!
             ( sleep "$secs"
