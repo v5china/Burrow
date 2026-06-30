@@ -64,15 +64,20 @@ jobs:
         env:
           ENGINE_PAT: ${{ secrets.ENGINE_PAT }}
         run: |
-          if [ -n "$ENGINE_PAT" ]; then
-            git config --global url."https://x-access-token:${ENGINE_PAT}@github.com/".insteadOf "https://github.com/"
-          fi
-          if git submodule update --init --recursive macos/vendor/burrow-engine; then
+          # Scope the token to JUST this submodule clone with `git -c` (git
+          # propagates -c to the submodule subprocess). Do NOT use
+          # `git config --global`: it writes ~/.gitconfig, which PERSISTS into
+          # later steps — and a leaked url.insteadOf rewrite of
+          # https://github.com/ makes the Build step's SPM hang forever fetching
+          # Sentry's binary xcframeworks (github.com release assets). That was
+          # the 0.9.0 release hang; ci.yml has no such step and resolves fine.
+          AUTH=()
+          [ -n "$ENGINE_PAT" ] && AUTH=(-c "url.https://x-access-token:${ENGINE_PAT}@github.com/.insteadOf=https://github.com/")
+          if git "${AUTH[@]}" submodule update --init --recursive macos/vendor/burrow-engine; then
             echo "engine: checked out at pinned commit $(git -C macos/vendor/burrow-engine rev-parse --short HEAD)"
           else
             echo "::warning::burrow-engine submodule unavailable — set ENGINE_PAT (private repo) or make it public. Shipping WITHOUT the bundled engine; the app resolves system \`mo\`, as before this migration."
           fi
-          git config --global --unset-all url."https://x-access-token:${ENGINE_PAT}@github.com/".insteadOf 2>/dev/null || true
 
       # The Build step runs `go build` to compile the bundled engine, whose
       # go.mod requires go >= 1.25.0. The runner ships several Go versions and
@@ -87,16 +92,13 @@ jobs:
           go-version: "1.26"
           cache: false
 
-      # Pin Xcode 26.2. The runner's newest (26.3) stalls indefinitely in SPM
-      # while fetching Sentry's binary xcframeworks — the 0.9.0 release hang;
-      # 26.2 is the version the clean 0.8.3 release built on. Still recent enough
-      # for the project format xcodegen emits. Fall back to the newest available
-      # only if 26.2 is ever dropped from the image.
-      - name: Select Xcode (pin 26.2 — 26.3 stalls SPM on Sentry artifacts)
-        run: |
-          XC="/Applications/Xcode_26.2.app"
-          [ -d "$XC" ] || XC="$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
-          sudo xcode-select -s "$XC" && xcodebuild -version
+      # Use the newest Xcode on the runner so xcodebuild can read the project
+      # format xcodegen emits (Homebrew's xcodegen targets the latest Xcode).
+      # ci.yml selects newest too and resolves SPM fine on the same runner — the
+      # earlier "26.3 stalls on Sentry" was a misdiagnosis; the real cause was a
+      # leaked global git url.insteadOf (fixed in the engine-fetch step above).
+      - name: Select newest Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)" && xcodebuild -version
 
       - name: Install xcodegen
         run: brew install xcodegen
@@ -117,7 +119,7 @@ jobs:
           # of hanging, and retry with a per-attempt time bound so a true network
           # stall is killed and re-attempted rather than eating the whole job.
           attempt_build() {
-            local secs=900 rc
+            local secs=1080 rc
             bash scripts/release.sh </dev/null &
             local pid=$!
             ( sleep "$secs"
