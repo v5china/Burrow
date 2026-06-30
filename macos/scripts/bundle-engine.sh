@@ -16,11 +16,17 @@ RESOURCES="${2:?resources dir required}"
 OUT="$RESOURCES/engine"
 
 # 1. Build the Go binaries (status-go, analyze-go) if Go is available; otherwise require
-#    that prebuilt ones already exist in the source bin/.
+#    that prebuilt ones already exist in the source bin/. Harden the build so it can NEVER
+#    silently block the release: GOTOOLCHAIN=local uses the installed Go and fails fast if
+#    it's too old, instead of auto-downloading a newer toolchain mid-build (that download
+#    hung the first 0.9.0 build); GIT_TERMINAL_PROMPT=0 + </dev/null prevent any wait on an
+#    interactive prompt. Release CI pins a Go >= go.mod's requirement via actions/setup-go.
+export GOTOOLCHAIN=local
+export GIT_TERMINAL_PROMPT=0
 if command -v go >/dev/null 2>&1; then
   ( cd "$ENGINE_SRC" \
-      && go build -ldflags="-s -w" -o bin/status-go ./cmd/status \
-      && go build -ldflags="-s -w" -o bin/analyze-go ./cmd/analyze )
+      && go build -ldflags="-s -w" -o bin/status-go ./cmd/status </dev/null \
+      && go build -ldflags="-s -w" -o bin/analyze-go ./cmd/analyze </dev/null )
 fi
 for b in status-go analyze-go; do
   [ -x "$ENGINE_SRC/bin/$b" ] || { echo "error: $ENGINE_SRC/bin/$b missing (need Go to build)"; exit 1; }

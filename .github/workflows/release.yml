@@ -74,6 +74,19 @@ jobs:
           fi
           git config --global --unset-all url."https://x-access-token:${ENGINE_PAT}@github.com/".insteadOf 2>/dev/null || true
 
+      # The Build step runs `go build` to compile the bundled engine, whose
+      # go.mod requires go >= 1.25.0. The runner ships several Go versions and
+      # its DEFAULT `go` may be older (1.24.x) — with GOTOOLCHAIN=auto that makes
+      # `go build` silently auto-download a toolchain mid-build, which stalled
+      # the first 0.9.0 build until the 40-min job timeout. Pin a Go that already
+      # satisfies go.mod so nothing is downloaded (bundle-engine.sh also forces
+      # GOTOOLCHAIN=local as a belt). Harmless if the engine isn't bundled.
+      - name: Set up Go (for the bundled engine)
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: "1.26"
+          cache: false
+
       # Use the newest Xcode on the runner so xcodebuild can read the project
       # format xcodegen emits (Homebrew's xcodegen targets the latest Xcode).
       - name: Select newest Xcode
@@ -89,7 +102,7 @@ jobs:
           POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
-          bash scripts/release.sh >/dev/null
+          bash scripts/release.sh
           APP="build_dist/Build/Products/Release/Burrow.app"
           [ -d "$APP" ] || { echo "::error::build produced no app at $APP"; exit 1; }
           VERSION=$(defaults read "$PWD/$APP/Contents/Info" CFBundleShortVersionString)
