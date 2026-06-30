@@ -87,10 +87,16 @@ jobs:
           go-version: "1.26"
           cache: false
 
-      # Use the newest Xcode on the runner so xcodebuild can read the project
-      # format xcodegen emits (Homebrew's xcodegen targets the latest Xcode).
-      - name: Select newest Xcode
-        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)" && xcodebuild -version
+      # Pin Xcode 26.2. The runner's newest (26.3) stalls indefinitely in SPM
+      # while fetching Sentry's binary xcframeworks — the 0.9.0 release hang;
+      # 26.2 is the version the clean 0.8.3 release built on. Still recent enough
+      # for the project format xcodegen emits. Fall back to the newest available
+      # only if 26.2 is ever dropped from the image.
+      - name: Select Xcode (pin 26.2 — 26.3 stalls SPM on Sentry artifacts)
+        run: |
+          XC="/Applications/Xcode_26.2.app"
+          [ -d "$XC" ] || XC="$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+          sudo xcode-select -s "$XC" && xcodebuild -version
 
       - name: Install xcodegen
         run: brew install xcodegen
