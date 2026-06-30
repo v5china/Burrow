@@ -33,6 +33,7 @@ xcodebuild -project macos/Burrow.xcodeproj -scheme Burrow \
   POSTHOG_API_KEY="${POSTHOG_API_KEY:-}" \
   POSTHOG_HOST="${POSTHOG_HOST:-https://us.i.posthog.com}" \
   SENTRY_DSN="${SENTRY_DSN:-}" \
+  ${BURROW_ENGINE_SRC:+BURROW_ENGINE_SRC="$BURROW_ENGINE_SRC"} \
   build
 
 APP="build_dist/Build/Products/Release/Burrow.app"

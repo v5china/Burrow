@@ -51,16 +51,41 @@ jobs:
       # not be able to run new code here. Comment keeps the version legible.
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
-      # [ISOLATION TEST — TEMPORARY] The engine-fetch + setup-go steps are
-      # removed here to make this job's pre-build sequence identical to the
-      # green ci.yml, to pinpoint the deterministic SPM hang. Restore them once
-      # the trigger is found.
+      # Fetch the bundled MIT engine OUTSIDE the work tree (into RUNNER_TEMP),
+      # at its pinned submodule commit. It must NOT live inside the repo as a
+      # submodule: an in-tree engine checkout made xcodebuild's SPM hang forever
+      # resolving Sentry's binary xcframeworks (proven by isolation — removing
+      # the in-tree fetch built + shipped in ~6 min; curl fetched the same 66 MB
+      # artifact in <1s, so it was never the network). The build phase reads
+      # BURROW_ENGINE_SRC. NON-FATAL: without ENGINE_PAT the app falls back to
+      # system `mo`. Token scoped via `git -c` (never global config).
+      - name: Fetch bundled engine (outside the work tree)
+        env:
+          ENGINE_PAT: ${{ secrets.ENGINE_PAT }}
+        run: |
+          SHA="$(git ls-tree HEAD macos/vendor/burrow-engine | awk '{print $3}')"
+          DEST="$RUNNER_TEMP/burrow-engine"
+          AUTH=()
+          [ -n "$ENGINE_PAT" ] && AUTH=(-c "url.https://x-access-token:${ENGINE_PAT}@github.com/.insteadOf=https://github.com/")
+          if git "${AUTH[@]}" clone --quiet https://github.com/caezium/burrow-engine.git "$DEST" \
+             && git -C "$DEST" -c advice.detachedHead=false checkout --quiet "$SHA"; then
+            echo "BURROW_ENGINE_SRC=$DEST" >> "$GITHUB_ENV"
+            echo "engine: cloned to $DEST @ ${SHA:0:7}"
+          else
+            echo "::warning::burrow-engine unavailable — set ENGINE_PAT or make it public. Shipping WITHOUT the bundled engine; app falls back to system \`mo\`."
+          fi
+
+      # Pin a Go that satisfies the engine's go.mod (>= 1.25) so the bundle
+      # phase's `go build` uses it directly (bundle-engine.sh forces
+      # GOTOOLCHAIN=local). Harmless when the engine isn't fetched.
+      - name: Set up Go (for the bundled engine)
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: "1.26"
+          cache: false
 
       # Use the newest Xcode on the runner so xcodebuild can read the project
       # format xcodegen emits (Homebrew's xcodegen targets the latest Xcode).
-      # ci.yml selects newest too and resolves SPM fine on the same runner — the
-      # earlier "26.3 stalls on Sentry" was a misdiagnosis; the real cause was a
-      # leaked global git url.insteadOf (fixed in the engine-fetch step above).
       - name: Select newest Xcode
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)" && xcodebuild -version
 
