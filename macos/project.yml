@@ -33,9 +33,13 @@ packages:
   PostHog:
     url: https://github.com/PostHog/posthog-ios
     exactVersion: 3.59.3
-  Sentry:
-    url: https://github.com/getsentry/sentry-cocoa
-    exactVersion: 9.16.1
+# Sentry is NOT an SPM package: SPM eagerly downloads ALL of sentry-cocoa's
+# binary xcframework variants during resolution (Sentry, -Dynamic, -WithARM64e,
+# …, ~500 MB), and on the release runner that download hard-hangs xcodebuild
+# (curl pulls the same artifact in <1s — it's an SPM-downloader problem). So we
+# vendor only the one static Sentry.xcframework we actually use, fetched by
+# scripts/fetch-sentry.sh (curl), and link it directly. Pin matches the old SPM
+# exactVersion. Crash reporting (CrashReporter.swift) is unchanged.
 
 targets:
   Burrow:
@@ -84,7 +88,8 @@ targets:
         SENTRY_DSN: ""
     dependencies:
       - package: PostHog
-      - package: Sentry
+      - framework: vendor/Sentry.xcframework
+        embed: false
     postBuildScripts:
       - name: Bundle burrow-engine (MIT)
         basedOnDependencyAnalysis: false

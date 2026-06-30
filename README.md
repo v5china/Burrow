@@ -322,6 +322,7 @@ open /Applications/Burrow.app
 ```bash
 brew install xcodegen mole
 git clone https://github.com/caezium/Burrow.git && cd Burrow/macos
+bash ../scripts/fetch-sentry.sh   # vendor Sentry.xcframework (it's a local framework, not an SPM dep)
 xcodegen generate
 xcodebuild -project Burrow.xcodeproj -scheme Burrow \
   -configuration Release -destination 'generic/platform=macOS' \
@@ -459,6 +460,7 @@ bridge still posts to `/mcp`.
 
 ```bash
 cd macos        # the macOS app lives here (monorepo: macos/ + windows/)
+bash ../scripts/fetch-sentry.sh   # vendor Sentry.xcframework (it's a local framework, not an SPM dep)
 xcodegen generate
 xcodebuild -project Burrow.xcodeproj -scheme Burrow \
   -configuration Debug -destination 'platform=macOS' test
