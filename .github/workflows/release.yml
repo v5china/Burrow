@@ -51,34 +51,16 @@ jobs:
       # not be able to run new code here. Comment keeps the version legible.
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
-      # Fetch the bundled MIT engine OUTSIDE the work tree (into RUNNER_TEMP),
-      # at its pinned submodule commit. It must NOT live inside the repo as a
-      # submodule: an in-tree engine checkout made xcodebuild's SPM hang forever
-      # resolving Sentry's binary xcframeworks (proven by isolation — removing
-      # the in-tree fetch built + shipped in ~6 min; curl fetched the same 66 MB
-      # artifact in <1s, so it was never the network). The build phase reads
-      # BURROW_ENGINE_SRC. NON-FATAL: without ENGINE_PAT the app falls back to
-      # system `mo`. Token scoped via `git -c` (never global config).
-      - name: Fetch bundled engine (outside the work tree)
-        env:
-          ENGINE_PAT: ${{ secrets.ENGINE_PAT }}
-        run: |
-          SHA="$(git ls-tree HEAD macos/vendor/burrow-engine | awk '{print $3}')"
-          DEST="$RUNNER_TEMP/burrow-engine"
-          AUTH=()
-          [ -n "$ENGINE_PAT" ] && AUTH=(-c "url.https://x-access-token:${ENGINE_PAT}@github.com/.insteadOf=https://github.com/")
-          if git "${AUTH[@]}" clone --quiet https://github.com/caezium/burrow-engine.git "$DEST" \
-             && git -C "$DEST" -c advice.detachedHead=false checkout --quiet "$SHA"; then
-            echo "BURROW_ENGINE_SRC=$DEST" >> "$GITHUB_ENV"
-            echo "engine: cloned to $DEST @ ${SHA:0:7}"
-          else
-            echo "::warning::burrow-engine unavailable — set ENGINE_PAT or make it public. Shipping WITHOUT the bundled engine; app falls back to system \`mo\`."
-          fi
-
-      # [BISECT — TEMP] setup-go removed to test whether IT (not the out-of-tree
-      # engine fetch) triggers the SPM/Sentry hang. The runner's default Go
-      # builds the engine; bundle-engine.sh uses GOTOOLCHAIN=auto to grab a
-      # newer toolchain if the default is too old (fast, and after SPM).
+      # NOTE: engine bundling is temporarily DISABLED. Fetching burrow-engine in
+      # this job (whether an in-tree submodule OR an out-of-tree clone) reliably
+      # made xcodebuild's SPM hang forever resolving Sentry's binary xcframeworks
+      # — proven by isolation: with no engine-fetch step the build ships in ~6
+      # min, and the engine-less 0.9.0 was published this way. ci.yml has no
+      # engine step and never hangs; `curl` fetches the same 66 MB Sentry
+      # artifact in <1s, so it's not the network, and global git config stays
+      # clean. The mechanism needs local Xcode SPM verbose logs to crack; until
+      # then the app ships resolving system `mo`, exactly as in 0.8.x. To
+      # re-enable, restore the fetch step (see git history) once it's fixed.
 
       # Use the newest Xcode on the runner so xcodebuild can read the project
       # format xcodegen emits (Homebrew's xcodegen targets the latest Xcode).
