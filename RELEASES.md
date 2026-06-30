@@ -1,3 +1,13 @@
+# Burrow 0.9.1
+
+A quick fix for **Intel Macs**. In 0.9.0 the newly-bundled engine binaries were
+built Apple-Silicon-only, so on Intel (x86_64) Macs Burrow could hang at
+initialization ([#221](https://github.com/caezium/Burrow/issues/221)). The engine
+(`status-go` / `analyze-go`) is now a **universal binary** (arm64 + x86_64) and
+runs natively on both architectures. No other changes from 0.9.0.
+
+---
+
 # Burrow 0.9.0
 
 Burrow's biggest release. It now **bundles its own engine** — no separate `mo`

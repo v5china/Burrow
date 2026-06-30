@@ -24,9 +24,22 @@ OUT="$RESOURCES/engine"
 export GOTOOLCHAIN=auto
 export GIT_TERMINAL_PROMPT=0
 if command -v go >/dev/null 2>&1; then
-  ( cd "$ENGINE_SRC" \
-      && go build -ldflags="-s -w" -o bin/status-go ./cmd/status </dev/null \
-      && go build -ldflags="-s -w" -o bin/analyze-go ./cmd/analyze </dev/null )
+  # Build UNIVERSAL (arm64 + x86_64) binaries so the engine runs on BOTH Apple
+  # Silicon and Intel Macs. The CI runner is Apple Silicon, so a plain `go build`
+  # emits arm64-only binaries — and on an Intel Mac the universal app then hangs
+  # at init trying to exec an engine it can't run (issue #221). macOS clang is a
+  # universal toolchain, so we cross-compile each slice (`clang -arch <arch>`,
+  # CGO kept on to preserve gopsutil's native sensors) and lipo them together.
+  ( cd "$ENGINE_SRC"
+    for pair in status:status-go analyze:analyze-go; do
+      cmd="${pair%%:*}"; out="${pair##*:}"
+      GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 CC="clang -arch arm64" \
+        go build -ldflags="-s -w" -o "bin/$out.arm64" "./cmd/$cmd" </dev/null
+      GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 CC="clang -arch x86_64" \
+        go build -ldflags="-s -w" -o "bin/$out.amd64" "./cmd/$cmd" </dev/null
+      lipo -create -output "bin/$out" "bin/$out.arm64" "bin/$out.amd64"
+      rm -f "bin/$out.arm64" "bin/$out.amd64"
+    done )
 fi
 for b in status-go analyze-go; do
   [ -x "$ENGINE_SRC/bin/$b" ] || { echo "error: $ENGINE_SRC/bin/$b missing (need Go to build)"; exit 1; }
