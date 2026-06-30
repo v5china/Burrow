@@ -427,17 +427,23 @@ Windows preview builds include the stdio bridge in source under
 `windows/Tools/McpStdioBridge/` and in release artifacts as
 `Assets\Mcp\burrow-mcp-stdio.exe`.
 
-**Tools:**
+**Tools** — 19 over MCP, read-only by default. The full reference, with **when an
+agent should reach for each**, is in **[docs/agent-tools.md](docs/agent-tools.md)**.
+The essentials:
 
-- `burrow_snapshot` — the latest full status snapshot
-- `burrow_history` — a time-series slice of recent snapshots
-- `burrow_top_processes` — top processes by peak CPU over a window
-- `burrow_process_usage` — rank processes by `cpu_time` / `peak_cpu` / `avg_cpu`
-  / `peak_mem`, with the window it used echoed back
-- `burrow_info` — what Burrow is recording, retention, and freshness
-- `burrow_list_apps` — installed apps and the IDs/names uninstall tools accept
-- `burrow_purge` — preview project artifact purge candidates
-- `burrow_installer` — preview old installer/archive cleanup candidates
+- **Status & history** — `burrow_snapshot`, `burrow_history`, `burrow_top_processes`,
+  `burrow_process_usage` (rank by `cpu_time`/`peak_cpu`/`avg_cpu`/`peak_mem`),
+  `burrow_diff`, `burrow_disk_forecast`, `burrow_report`
+- **Diagnose** — `burrow_doctor` (Full Disk Access, memory pressure, disk headroom,
+  SIP/Gatekeeper/FileVault/firewall, battery, high-CPU, display/volume/network),
+  `burrow_ports`, `burrow_info`
+- **Disk & apps** — `burrow_analyze`, `burrow_list_apps`, `burrow_cleanup_history`,
+  `burrow_deleted_files`
+- **Maintain (gated)** — `burrow_clean`, `burrow_optimize`, `burrow_uninstall`,
+  `burrow_purge`, `burrow_installer`
+
+Actuating tools preview (`--dry-run`) unless `confirm:true` **and** the matching
+Settings opt-in is enabled — an agent can always look, but only acts with your say-so.
 
 Windows also keeps `burrow_uninstall(action=...)` as a compatibility tool for
 list, leftover-preview, and confirmed vendor-uninstaller launch workflows.
